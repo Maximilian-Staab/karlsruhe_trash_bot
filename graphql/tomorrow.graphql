@@ -1,0 +1,12 @@
+query TrashAtDate {
+    dates(where: {
+        date: {
+            _eq: "tomorrow()"
+        }})
+    {
+        date
+        trashTypeByTrashType {
+            name
+        }
+    }
+}

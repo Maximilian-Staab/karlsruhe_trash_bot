@@ -1,0 +1,1016 @@
+schema {
+  query: query_root
+  mutation: mutation_root
+  subscription: subscription_root
+}
+
+scalar date
+
+"""
+Boolean expression to compare columns of type "date". All fields are combined with logical 'AND'.
+"""
+input date_comparison_exp {
+  _eq: date
+  _gt: date
+  _gte: date
+  _in: [date!]
+  _is_null: Boolean
+  _lt: date
+  _lte: date
+  _neq: date
+  _nin: [date!]
+}
+
+"""
+Collection of date 
+
+
+columns and relationships of "dates"
+
+"""
+type dates {
+  created_at: timestamptz!
+  date: date!
+  id: Int!
+
+  """An object relationship"""
+  trashTypeByTrashType: trash_types!
+  trash_type: Int!
+}
+
+"""
+aggregated selection of "dates"
+"""
+type dates_aggregate {
+  aggregate: dates_aggregate_fields
+  nodes: [dates!]!
+}
+
+"""
+aggregate fields of "dates"
+"""
+type dates_aggregate_fields {
+  avg: dates_avg_fields
+  count(columns: [dates_select_column!], distinct: Boolean): Int!
+  max: dates_max_fields
+  min: dates_min_fields
+  stddev: dates_stddev_fields
+  stddev_pop: dates_stddev_pop_fields
+  stddev_samp: dates_stddev_samp_fields
+  sum: dates_sum_fields
+  var_pop: dates_var_pop_fields
+  var_samp: dates_var_samp_fields
+  variance: dates_variance_fields
+}
+
+"""
+order by aggregate values of table "dates"
+"""
+input dates_aggregate_order_by {
+  avg: dates_avg_order_by
+  count: order_by
+  max: dates_max_order_by
+  min: dates_min_order_by
+  stddev: dates_stddev_order_by
+  stddev_pop: dates_stddev_pop_order_by
+  stddev_samp: dates_stddev_samp_order_by
+  sum: dates_sum_order_by
+  var_pop: dates_var_pop_order_by
+  var_samp: dates_var_samp_order_by
+  variance: dates_variance_order_by
+}
+
+"""
+input type for inserting array relation for remote table "dates"
+"""
+input dates_arr_rel_insert_input {
+  data: [dates_insert_input!]!
+
+  """on conflict condition"""
+  on_conflict: dates_on_conflict
+}
+
+"""aggregate avg on columns"""
+type dates_avg_fields {
+  id: Float
+  trash_type: Float
+}
+
+"""
+order by avg() on columns of table "dates"
+"""
+input dates_avg_order_by {
+  id: order_by
+  trash_type: order_by
+}
+
+"""
+Boolean expression to filter rows from the table "dates". All fields are combined with a logical 'AND'.
+"""
+input dates_bool_exp {
+  _and: [dates_bool_exp!]
+  _not: dates_bool_exp
+  _or: [dates_bool_exp!]
+  created_at: timestamptz_comparison_exp
+  date: date_comparison_exp
+  id: Int_comparison_exp
+  trashTypeByTrashType: trash_types_bool_exp
+  trash_type: Int_comparison_exp
+}
+
+"""
+unique or primary key constraints on table "dates"
+"""
+enum dates_constraint {
+  """unique or primary key constraint"""
+  dates_pkey
+
+  """unique or primary key constraint"""
+  dates_trash_type_date_key
+}
+
+"""
+input type for incrementing numeric columns in table "dates"
+"""
+input dates_inc_input {
+  id: Int
+  trash_type: Int
+}
+
+"""
+input type for inserting data into table "dates"
+"""
+input dates_insert_input {
+  created_at: timestamptz
+  date: date
+  id: Int
+  trashTypeByTrashType: trash_types_obj_rel_insert_input
+  trash_type: Int
+}
+
+"""aggregate max on columns"""
+type dates_max_fields {
+  created_at: timestamptz
+  date: date
+  id: Int
+  trash_type: Int
+}
+
+"""
+order by max() on columns of table "dates"
+"""
+input dates_max_order_by {
+  created_at: order_by
+  date: order_by
+  id: order_by
+  trash_type: order_by
+}
+
+"""aggregate min on columns"""
+type dates_min_fields {
+  created_at: timestamptz
+  date: date
+  id: Int
+  trash_type: Int
+}
+
+"""
+order by min() on columns of table "dates"
+"""
+input dates_min_order_by {
+  created_at: order_by
+  date: order_by
+  id: order_by
+  trash_type: order_by
+}
+
+"""
+response of any mutation on the table "dates"
+"""
+type dates_mutation_response {
+  """number of rows affected by the mutation"""
+  affected_rows: Int!
+
+  """data from the rows affected by the mutation"""
+  returning: [dates!]!
+}
+
+"""
+on conflict condition type for table "dates"
+"""
+input dates_on_conflict {
+  constraint: dates_constraint!
+  update_columns: [dates_update_column!]! = []
+  where: dates_bool_exp
+}
+
+"""Ordering options when selecting data from "dates"."""
+input dates_order_by {
+  created_at: order_by
+  date: order_by
+  id: order_by
+  trashTypeByTrashType: trash_types_order_by
+  trash_type: order_by
+}
+
+"""primary key columns input for table: dates"""
+input dates_pk_columns_input {
+  id: Int!
+}
+
+"""
+select columns of table "dates"
+"""
+enum dates_select_column {
+  """column name"""
+  created_at
+
+  """column name"""
+  date
+
+  """column name"""
+  id
+
+  """column name"""
+  trash_type
+}
+
+"""
+input type for updating data in table "dates"
+"""
+input dates_set_input {
+  created_at: timestamptz
+  date: date
+  id: Int
+  trash_type: Int
+}
+
+"""aggregate stddev on columns"""
+type dates_stddev_fields {
+  id: Float
+  trash_type: Float
+}
+
+"""
+order by stddev() on columns of table "dates"
+"""
+input dates_stddev_order_by {
+  id: order_by
+  trash_type: order_by
+}
+
+"""aggregate stddev_pop on columns"""
+type dates_stddev_pop_fields {
+  id: Float
+  trash_type: Float
+}
+
+"""
+order by stddev_pop() on columns of table "dates"
+"""
+input dates_stddev_pop_order_by {
+  id: order_by
+  trash_type: order_by
+}
+
+"""aggregate stddev_samp on columns"""
+type dates_stddev_samp_fields {
+  id: Float
+  trash_type: Float
+}
+
+"""
+order by stddev_samp() on columns of table "dates"
+"""
+input dates_stddev_samp_order_by {
+  id: order_by
+  trash_type: order_by
+}
+
+"""aggregate sum on columns"""
+type dates_sum_fields {
+  id: Int
+  trash_type: Int
+}
+
+"""
+order by sum() on columns of table "dates"
+"""
+input dates_sum_order_by {
+  id: order_by
+  trash_type: order_by
+}
+
+"""
+update columns of table "dates"
+"""
+enum dates_update_column {
+  """column name"""
+  created_at
+
+  """column name"""
+  date
+
+  """column name"""
+  id
+
+  """column name"""
+  trash_type
+}
+
+"""aggregate var_pop on columns"""
+type dates_var_pop_fields {
+  id: Float
+  trash_type: Float
+}
+
+"""
+order by var_pop() on columns of table "dates"
+"""
+input dates_var_pop_order_by {
+  id: order_by
+  trash_type: order_by
+}
+
+"""aggregate var_samp on columns"""
+type dates_var_samp_fields {
+  id: Float
+  trash_type: Float
+}
+
+"""
+order by var_samp() on columns of table "dates"
+"""
+input dates_var_samp_order_by {
+  id: order_by
+  trash_type: order_by
+}
+
+"""aggregate variance on columns"""
+type dates_variance_fields {
+  id: Float
+  trash_type: Float
+}
+
+"""
+order by variance() on columns of table "dates"
+"""
+input dates_variance_order_by {
+  id: order_by
+  trash_type: order_by
+}
+
+"""
+Boolean expression to compare columns of type "Int". All fields are combined with logical 'AND'.
+"""
+input Int_comparison_exp {
+  _eq: Int
+  _gt: Int
+  _gte: Int
+  _in: [Int!]
+  _is_null: Boolean
+  _lt: Int
+  _lte: Int
+  _neq: Int
+  _nin: [Int!]
+}
+
+"""mutation root"""
+type mutation_root {
+  """
+  delete data from the table: "dates"
+  """
+  delete_dates(
+    """filter the rows which have to be deleted"""
+    where: dates_bool_exp!
+  ): dates_mutation_response
+
+  """
+  delete single row from the table: "dates"
+  """
+  delete_dates_by_pk(id: Int!): dates
+
+  """
+  delete data from the table: "trash_types"
+  """
+  delete_trash_types(
+    """filter the rows which have to be deleted"""
+    where: trash_types_bool_exp!
+  ): trash_types_mutation_response
+
+  """
+  delete single row from the table: "trash_types"
+  """
+  delete_trash_types_by_pk(id: Int!): trash_types
+
+  """
+  insert data into the table: "dates"
+  """
+  insert_dates(
+    """the rows to be inserted"""
+    objects: [dates_insert_input!]!
+
+    """on conflict condition"""
+    on_conflict: dates_on_conflict
+  ): dates_mutation_response
+
+  """
+  insert a single row into the table: "dates"
+  """
+  insert_dates_one(
+    """the row to be inserted"""
+    object: dates_insert_input!
+
+    """on conflict condition"""
+    on_conflict: dates_on_conflict
+  ): dates
+
+  """
+  insert data into the table: "trash_types"
+  """
+  insert_trash_types(
+    """the rows to be inserted"""
+    objects: [trash_types_insert_input!]!
+
+    """on conflict condition"""
+    on_conflict: trash_types_on_conflict
+  ): trash_types_mutation_response
+
+  """
+  insert a single row into the table: "trash_types"
+  """
+  insert_trash_types_one(
+    """the row to be inserted"""
+    object: trash_types_insert_input!
+
+    """on conflict condition"""
+    on_conflict: trash_types_on_conflict
+  ): trash_types
+
+  """
+  update data of the table: "dates"
+  """
+  update_dates(
+    """increments the numeric columns with given value of the filtered values"""
+    _inc: dates_inc_input
+
+    """sets the columns of the filtered rows to the given values"""
+    _set: dates_set_input
+
+    """filter the rows which have to be updated"""
+    where: dates_bool_exp!
+  ): dates_mutation_response
+
+  """
+  update single row of the table: "dates"
+  """
+  update_dates_by_pk(
+    """increments the numeric columns with given value of the filtered values"""
+    _inc: dates_inc_input
+
+    """sets the columns of the filtered rows to the given values"""
+    _set: dates_set_input
+    pk_columns: dates_pk_columns_input!
+  ): dates
+
+  """
+  update data of the table: "trash_types"
+  """
+  update_trash_types(
+    """increments the numeric columns with given value of the filtered values"""
+    _inc: trash_types_inc_input
+
+    """sets the columns of the filtered rows to the given values"""
+    _set: trash_types_set_input
+
+    """filter the rows which have to be updated"""
+    where: trash_types_bool_exp!
+  ): trash_types_mutation_response
+
+  """
+  update single row of the table: "trash_types"
+  """
+  update_trash_types_by_pk(
+    """increments the numeric columns with given value of the filtered values"""
+    _inc: trash_types_inc_input
+
+    """sets the columns of the filtered rows to the given values"""
+    _set: trash_types_set_input
+    pk_columns: trash_types_pk_columns_input!
+  ): trash_types
+}
+
+"""column ordering options"""
+enum order_by {
+  """in ascending order, nulls last"""
+  asc
+
+  """in ascending order, nulls first"""
+  asc_nulls_first
+
+  """in ascending order, nulls last"""
+  asc_nulls_last
+
+  """in descending order, nulls first"""
+  desc
+
+  """in descending order, nulls first"""
+  desc_nulls_first
+
+  """in descending order, nulls last"""
+  desc_nulls_last
+}
+
+type query_root {
+  """
+  fetch data from the table: "dates"
+  """
+  dates(
+    """distinct select on columns"""
+    distinct_on: [dates_select_column!]
+
+    """limit the number of rows returned"""
+    limit: Int
+
+    """skip the first n rows. Use only with order_by"""
+    offset: Int
+
+    """sort the rows by one or more columns"""
+    order_by: [dates_order_by!]
+
+    """filter the rows returned"""
+    where: dates_bool_exp
+  ): [dates!]!
+
+  """An aggregate relationship"""
+  dates_aggregate(
+    """distinct select on columns"""
+    distinct_on: [dates_select_column!]
+
+    """limit the number of rows returned"""
+    limit: Int
+
+    """skip the first n rows. Use only with order_by"""
+    offset: Int
+
+    """sort the rows by one or more columns"""
+    order_by: [dates_order_by!]
+
+    """filter the rows returned"""
+    where: dates_bool_exp
+  ): dates_aggregate!
+
+  """fetch data from the table: "dates" using primary key columns"""
+  dates_by_pk(id: Int!): dates
+
+  """
+  fetch data from the table: "trash_types"
+  """
+  trash_types(
+    """distinct select on columns"""
+    distinct_on: [trash_types_select_column!]
+
+    """limit the number of rows returned"""
+    limit: Int
+
+    """skip the first n rows. Use only with order_by"""
+    offset: Int
+
+    """sort the rows by one or more columns"""
+    order_by: [trash_types_order_by!]
+
+    """filter the rows returned"""
+    where: trash_types_bool_exp
+  ): [trash_types!]!
+
+  """
+  fetch aggregated fields from the table: "trash_types"
+  """
+  trash_types_aggregate(
+    """distinct select on columns"""
+    distinct_on: [trash_types_select_column!]
+
+    """limit the number of rows returned"""
+    limit: Int
+
+    """skip the first n rows. Use only with order_by"""
+    offset: Int
+
+    """sort the rows by one or more columns"""
+    order_by: [trash_types_order_by!]
+
+    """filter the rows returned"""
+    where: trash_types_bool_exp
+  ): trash_types_aggregate!
+
+  """fetch data from the table: "trash_types" using primary key columns"""
+  trash_types_by_pk(id: Int!): trash_types
+}
+
+"""
+Boolean expression to compare columns of type "String". All fields are combined with logical 'AND'.
+"""
+input String_comparison_exp {
+  _eq: String
+  _gt: String
+  _gte: String
+
+  """does the column match the given case-insensitive pattern"""
+  _ilike: String
+  _in: [String!]
+
+  """
+  does the column match the given POSIX regular expression, case insensitive
+  """
+  _iregex: String
+  _is_null: Boolean
+
+  """does the column match the given pattern"""
+  _like: String
+  _lt: String
+  _lte: String
+  _neq: String
+
+  """does the column NOT match the given case-insensitive pattern"""
+  _nilike: String
+  _nin: [String!]
+
+  """
+  does the column NOT match the given POSIX regular expression, case insensitive
+  """
+  _niregex: String
+
+  """does the column NOT match the given pattern"""
+  _nlike: String
+
+  """
+  does the column NOT match the given POSIX regular expression, case sensitive
+  """
+  _nregex: String
+
+  """does the column NOT match the given SQL regular expression"""
+  _nsimilar: String
+
+  """
+  does the column match the given POSIX regular expression, case sensitive
+  """
+  _regex: String
+
+  """does the column match the given SQL regular expression"""
+  _similar: String
+}
+
+type subscription_root {
+  """
+  fetch data from the table: "dates"
+  """
+  dates(
+    """distinct select on columns"""
+    distinct_on: [dates_select_column!]
+
+    """limit the number of rows returned"""
+    limit: Int
+
+    """skip the first n rows. Use only with order_by"""
+    offset: Int
+
+    """sort the rows by one or more columns"""
+    order_by: [dates_order_by!]
+
+    """filter the rows returned"""
+    where: dates_bool_exp
+  ): [dates!]!
+
+  """An aggregate relationship"""
+  dates_aggregate(
+    """distinct select on columns"""
+    distinct_on: [dates_select_column!]
+
+    """limit the number of rows returned"""
+    limit: Int
+
+    """skip the first n rows. Use only with order_by"""
+    offset: Int
+
+    """sort the rows by one or more columns"""
+    order_by: [dates_order_by!]
+
+    """filter the rows returned"""
+    where: dates_bool_exp
+  ): dates_aggregate!
+
+  """fetch data from the table: "dates" using primary key columns"""
+  dates_by_pk(id: Int!): dates
+
+  """
+  fetch data from the table: "trash_types"
+  """
+  trash_types(
+    """distinct select on columns"""
+    distinct_on: [trash_types_select_column!]
+
+    """limit the number of rows returned"""
+    limit: Int
+
+    """skip the first n rows. Use only with order_by"""
+    offset: Int
+
+    """sort the rows by one or more columns"""
+    order_by: [trash_types_order_by!]
+
+    """filter the rows returned"""
+    where: trash_types_bool_exp
+  ): [trash_types!]!
+
+  """
+  fetch aggregated fields from the table: "trash_types"
+  """
+  trash_types_aggregate(
+    """distinct select on columns"""
+    distinct_on: [trash_types_select_column!]
+
+    """limit the number of rows returned"""
+    limit: Int
+
+    """skip the first n rows. Use only with order_by"""
+    offset: Int
+
+    """sort the rows by one or more columns"""
+    order_by: [trash_types_order_by!]
+
+    """filter the rows returned"""
+    where: trash_types_bool_exp
+  ): trash_types_aggregate!
+
+  """fetch data from the table: "trash_types" using primary key columns"""
+  trash_types_by_pk(id: Int!): trash_types
+}
+
+scalar timestamptz
+
+"""
+Boolean expression to compare columns of type "timestamptz". All fields are combined with logical 'AND'.
+"""
+input timestamptz_comparison_exp {
+  _eq: timestamptz
+  _gt: timestamptz
+  _gte: timestamptz
+  _in: [timestamptz!]
+  _is_null: Boolean
+  _lt: timestamptz
+  _lte: timestamptz
+  _neq: timestamptz
+  _nin: [timestamptz!]
+}
+
+"""
+Types of Trash
+
+
+columns and relationships of "trash_types"
+
+"""
+type trash_types {
+  created_at: timestamptz!
+
+  """
+  fetch data from the table: "dates"
+  """
+  dates(
+    """distinct select on columns"""
+    distinct_on: [dates_select_column!]
+
+    """limit the number of rows returned"""
+    limit: Int
+
+    """skip the first n rows. Use only with order_by"""
+    offset: Int
+
+    """sort the rows by one or more columns"""
+    order_by: [dates_order_by!]
+
+    """filter the rows returned"""
+    where: dates_bool_exp
+  ): [dates!]!
+
+  """An aggregate relationship"""
+  dates_aggregate(
+    """distinct select on columns"""
+    distinct_on: [dates_select_column!]
+
+    """limit the number of rows returned"""
+    limit: Int
+
+    """skip the first n rows. Use only with order_by"""
+    offset: Int
+
+    """sort the rows by one or more columns"""
+    order_by: [dates_order_by!]
+
+    """filter the rows returned"""
+    where: dates_bool_exp
+  ): dates_aggregate!
+  id: Int!
+  name: String!
+}
+
+"""
+aggregated selection of "trash_types"
+"""
+type trash_types_aggregate {
+  aggregate: trash_types_aggregate_fields
+  nodes: [trash_types!]!
+}
+
+"""
+aggregate fields of "trash_types"
+"""
+type trash_types_aggregate_fields {
+  avg: trash_types_avg_fields
+  count(columns: [trash_types_select_column!], distinct: Boolean): Int!
+  max: trash_types_max_fields
+  min: trash_types_min_fields
+  stddev: trash_types_stddev_fields
+  stddev_pop: trash_types_stddev_pop_fields
+  stddev_samp: trash_types_stddev_samp_fields
+  sum: trash_types_sum_fields
+  var_pop: trash_types_var_pop_fields
+  var_samp: trash_types_var_samp_fields
+  variance: trash_types_variance_fields
+}
+
+"""aggregate avg on columns"""
+type trash_types_avg_fields {
+  id: Float
+}
+
+"""
+Boolean expression to filter rows from the table "trash_types". All fields are combined with a logical 'AND'.
+"""
+input trash_types_bool_exp {
+  _and: [trash_types_bool_exp!]
+  _not: trash_types_bool_exp
+  _or: [trash_types_bool_exp!]
+  created_at: timestamptz_comparison_exp
+  dates: dates_bool_exp
+  id: Int_comparison_exp
+  name: String_comparison_exp
+}
+
+"""
+unique or primary key constraints on table "trash_types"
+"""
+enum trash_types_constraint {
+  """unique or primary key constraint"""
+  trash_types_name_key
+
+  """unique or primary key constraint"""
+  trash_types_pkey
+}
+
+"""
+input type for incrementing numeric columns in table "trash_types"
+"""
+input trash_types_inc_input {
+  id: Int
+}
+
+"""
+input type for inserting data into table "trash_types"
+"""
+input trash_types_insert_input {
+  created_at: timestamptz
+  dates: dates_arr_rel_insert_input
+  id: Int
+  name: String
+}
+
+"""aggregate max on columns"""
+type trash_types_max_fields {
+  created_at: timestamptz
+  id: Int
+  name: String
+}
+
+"""aggregate min on columns"""
+type trash_types_min_fields {
+  created_at: timestamptz
+  id: Int
+  name: String
+}
+
+"""
+response of any mutation on the table "trash_types"
+"""
+type trash_types_mutation_response {
+  """number of rows affected by the mutation"""
+  affected_rows: Int!
+
+  """data from the rows affected by the mutation"""
+  returning: [trash_types!]!
+}
+
+"""
+input type for inserting object relation for remote table "trash_types"
+"""
+input trash_types_obj_rel_insert_input {
+  data: trash_types_insert_input!
+
+  """on conflict condition"""
+  on_conflict: trash_types_on_conflict
+}
+
+"""
+on conflict condition type for table "trash_types"
+"""
+input trash_types_on_conflict {
+  constraint: trash_types_constraint!
+  update_columns: [trash_types_update_column!]! = []
+  where: trash_types_bool_exp
+}
+
+"""Ordering options when selecting data from "trash_types"."""
+input trash_types_order_by {
+  created_at: order_by
+  dates_aggregate: dates_aggregate_order_by
+  id: order_by
+  name: order_by
+}
+
+"""primary key columns input for table: trash_types"""
+input trash_types_pk_columns_input {
+  id: Int!
+}
+
+"""
+select columns of table "trash_types"
+"""
+enum trash_types_select_column {
+  """column name"""
+  created_at
+
+  """column name"""
+  id
+
+  """column name"""
+  name
+}
+
+"""
+input type for updating data in table "trash_types"
+"""
+input trash_types_set_input {
+  created_at: timestamptz
+  id: Int
+  name: String
+}
+
+"""aggregate stddev on columns"""
+type trash_types_stddev_fields {
+  id: Float
+}
+
+"""aggregate stddev_pop on columns"""
+type trash_types_stddev_pop_fields {
+  id: Float
+}
+
+"""aggregate stddev_samp on columns"""
+type trash_types_stddev_samp_fields {
+  id: Float
+}
+
+"""aggregate sum on columns"""
+type trash_types_sum_fields {
+  id: Int
+}
+
+"""
+update columns of table "trash_types"
+"""
+enum trash_types_update_column {
+  """column name"""
+  created_at
+
+  """column name"""
+  id
+
+  """column name"""
+  name
+}
+
+"""aggregate var_pop on columns"""
+type trash_types_var_pop_fields {
+  id: Float
+}
+
+"""aggregate var_samp on columns"""
+type trash_types_var_samp_fields {
+  id: Float
+}
+
+"""aggregate variance on columns"""
+type trash_types_variance_fields {
+  id: Float
+}
+
