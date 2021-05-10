@@ -1,9 +1,9 @@
 #[tokio::test]
 async fn test_graphql_query() {
     println!("Testing");
-    let result = telegram_bot::trash_dates::trash::perform_my_query()
+    let result = trash_bot::trash_dates::get_tomorrows_trash()
         .await
         .expect("No data found.");
-    println!("{:?}", result);
+    println!("This is the test result: {:?}", result);
     assert!(true);
 }
