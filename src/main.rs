@@ -1,16 +1,13 @@
 use std::env;
+use std::future::Future;
 
 use anyhow::Error;
 use carapax::methods::SendMessage;
 use carapax::Api;
 use log::info;
-use std::fmt::Display;
-use std::future::Future;
-use std::ops::{Index, RangeBounds, RangeFull};
-use std::process::Output;
-use std::slice::SliceIndex;
 use tokio::time::Duration;
-use trash_bot::trash_dates::TrashDate;
+
+use trash_bot::trash_dates::{RequestPerformer, User};
 
 pub mod trash_dates;
 
@@ -32,12 +29,10 @@ where
     }
 }
 
-async fn get_users() {}
-
 async fn perform_tasks() {
-    let request_performer = trash_dates::RequestPerformer::from_env();
+    let request_performer = RequestPerformer::from_env();
 
-    let users: Vec<trash_dates::User> = match request_performer.get_active_users().await {
+    let users: Vec<User> = match request_performer.get_active_users().await {
         Ok(t) => t,
         Err(e) => {
             log::warn!("No users with active notifications found: {}", e);
@@ -47,12 +42,12 @@ async fn perform_tasks() {
 
     for user in users {
         tokio::spawn(async move {
-            let request_performer = trash_dates::RequestPerformer::from_env();
+            let request_performer = RequestPerformer::from_env();
 
             let token = env::var("TELEGRAM_BOT_TOKEN").expect("TELEGRAM_BOT_TOKEN not set");
             let api: Api = Api::new(token).unwrap();
 
-            let future_result = request_performer.get_tomorrows_trash();
+            let future_result = request_performer.get_tomorrows_trash(user.client_id);
             api.execute(SendMessage::new(
                 user.client_id,
                 get_message(future_result).await,
@@ -70,13 +65,12 @@ async fn run() {
 
     let mut scheduler = AsyncScheduler::with_tz(chrono_tz::Europe::Berlin);
 
-    perform_tasks().await;
-    // scheduler.every(1.day()).at("16:00:00").run(perform_tasks);
-    //
-    // loop {
-    //     scheduler.run_pending().await;
-    //     tokio::time::sleep(Duration::from_secs(10)).await;
-    // }
+    scheduler.every(1.day()).at("16:00:00").run(perform_tasks);
+
+    loop {
+        scheduler.run_pending().await;
+        tokio::time::sleep(Duration::from_secs(10)).await;
+    }
 
     // REst
 

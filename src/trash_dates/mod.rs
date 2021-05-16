@@ -1,13 +1,11 @@
-use anyhow::Error;
-use chrono::NaiveDate;
-use graphql_client::{GraphQLQuery, Response};
-use lazy_static::lazy_static;
-use maplit::hashmap;
-use reqwest::Client;
-use std::collections::HashMap;
 use std::env;
 use std::fmt::Formatter;
 use std::hash::Hash;
+
+use anyhow::Error;
+use chrono::NaiveDate;
+use graphql_client::{GraphQLQuery, Response};
+use reqwest::Client;
 
 static HASURA_HEADER: &str = "x-hasura-admin-secret";
 
@@ -34,11 +32,11 @@ pub struct User {
 #[derive(GraphQLQuery, Debug)]
 #[graphql(
     schema_path = "graphql/schema.graphql",
-    query_path = "graphql/tomorrow.graphql",
+    query_path = "graphql/tomorrow_for_user.graphql",
     response_derives = "Debug",
     normalization = "rust"
 )]
-pub struct TrashAtDate;
+pub struct TomorrowForUser;
 
 #[derive(GraphQLQuery, Debug)]
 #[graphql(
@@ -56,13 +54,57 @@ pub struct RequestPerformer {
     client: Client,
 }
 
+#[derive(Debug, Clone)]
+pub struct TrashDate {
+    pub date: NaiveDate,
+    pub trash_type: TrashType,
+    pub name: String,
+}
+
 impl From<active_users::ActiveUsersUsers> for User {
     fn from(au: active_users::ActiveUsersUsers) -> Self {
         User {
             client_id: au.telegram_chat_id,
-            first_name: au.first_name.unwrap_or("".to_string()),
-            last_name: au.last_name.unwrap_or("".to_string()),
+            first_name: au.first_name.unwrap_or_else(|| "".to_string()),
+            last_name: au.last_name.unwrap_or_else(|| "".to_string()),
         }
+    }
+}
+
+impl From<tomorrow_for_user::TomorrowForUserDates> for TrashDate {
+    fn from(tat: tomorrow_for_user::TomorrowForUserDates) -> Self {
+        let trash_type = match &tat.trash_type_by_trash_type.name[..] {
+            "Bioabfall" => TrashType::Organic,
+            "Wertstoff" => TrashType::Recycling,
+            "Papier" => TrashType::Paper,
+            "Restmüll" => TrashType::Miscellaneous,
+            _ => panic!(
+                "Could not find the selected type of trash: {}",
+                &tat.trash_type_by_trash_type.name[..]
+            ),
+        };
+
+        TrashDate {
+            name: tat.trash_type_by_trash_type.name,
+            date: tat.date,
+            trash_type,
+        }
+    }
+}
+
+impl std::fmt::Display for TrashDate {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "{}: {}", self.name, self.date)
+    }
+}
+
+impl std::fmt::Display for User {
+    fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
+        write!(
+            f,
+            "{} {}: {}",
+            self.first_name, self.last_name, self.client_id
+        )
     }
 }
 
@@ -84,35 +126,9 @@ impl RequestPerformer {
         )
     }
 
-    fn build_objects_from_query(
-        &self,
-        trash_response: &trash_at_date::ResponseData,
-    ) -> Vec<TrashDate> {
-        let mut data: Vec<TrashDate> = Vec::with_capacity(trash_response.dates.len());
-        // let mut data: Vec<TrashDate> = Vec::new();
-
-        for res in &trash_response.dates[..] {
-            let possible_trash_type = TRASH_MAP.get(&res.trash_type_by_trash_type.name[..]);
-            if let Some(t) = possible_trash_type {
-                data.push(TrashDate {
-                    date: res.date,
-                    trash_type: t.clone(),
-                    name: res.trash_type_by_trash_type.name.to_owned(),
-                });
-            } else {
-                log::warn!(
-                    "Could not find the selected type of trash: {}",
-                    &res.trash_type_by_trash_type.name[..]
-                );
-            }
-        }
-
-        data
-    }
-
-    pub async fn get_tomorrows_trash(&self) -> Result<Vec<TrashDate>, Error> {
+    pub async fn get_tomorrows_trash(&self, user_id: i64) -> Result<Vec<TrashDate>, Error> {
         // let variables: trash_at_date::Variables();
-        let request_body = TrashAtDate::build_query(trash_at_date::Variables {});
+        let request_body = TomorrowForUser::build_query(tomorrow_for_user::Variables { user_id });
 
         let response = self
             .client
@@ -122,14 +138,17 @@ impl RequestPerformer {
             .send()
             .await?;
 
-        let response_body: Response<trash_at_date::ResponseData> = response.json().await?;
+        let response_body: Response<tomorrow_for_user::ResponseData> = response.json().await?;
 
         self.log_errors(&response_body);
 
-        let response_data: trash_at_date::ResponseData =
-            response_body.data.expect("no response data");
-
-        Ok(self.build_objects_from_query(&response_data))
+        Ok(response_body
+            .data
+            .expect("no response data")
+            .dates
+            .into_iter()
+            .map(TrashDate::from)
+            .collect())
     }
 
     fn log_errors<T>(&self, response: &Response<T>) {
@@ -161,46 +180,5 @@ impl RequestPerformer {
             response_body.data.expect("no response data");
 
         Ok(response_data.users.into_iter().map(User::from).collect())
-    }
-}
-
-lazy_static! {
-    static ref TRASH_MAP: HashMap<&'static str, TrashType> = hashmap! {
-        "Bioabfall" => TrashType::Organic,
-        "Wertstoff"=> TrashType::Recycling,
-        "Papier"=> TrashType::Paper,
-        "Restmüll"=> TrashType::Miscellaneous,
-    };
-}
-
-lazy_static! {
-    static ref TRASH_TO_STRING: HashMap<TrashType, &'static str> = hashmap! {
-        TrashType::Organic => "Bioabfall",
-        TrashType::Recycling => "Wertstoff",
-        TrashType::Paper => "Papier",
-        TrashType::Miscellaneous => "Restmüll",
-    };
-}
-
-#[derive(Debug, Clone)]
-pub struct TrashDate {
-    pub date: NaiveDate,
-    pub trash_type: TrashType,
-    pub name: String,
-}
-
-impl std::fmt::Display for TrashDate {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "{}: {}", self.name, self.date)
-    }
-}
-
-impl std::fmt::Display for User {
-    fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
-        write!(
-            f,
-            "{} {}: {}",
-            self.first_name, self.last_name, self.client_id
-        )
     }
 }
