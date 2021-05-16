@@ -611,12 +611,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "maplit"
-version = "1.0.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3e2e65a1a2e43cfcb47a895c4c8b10d1f4a61097f9f254f183aee60cad9c651d"
-
-[[package]]
 name = "matches"
 version = "0.1.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1188,9 +1182,7 @@ dependencies = [
  "clokwerk",
  "futures",
  "graphql_client",
- "lazy_static",
  "log",
- "maplit",
  "reqwest",
  "serde",
  "serde_json",
