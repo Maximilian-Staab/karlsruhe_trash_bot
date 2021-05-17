@@ -1,7 +1,5 @@
 use std::env;
-use std::future::Future;
 
-use anyhow::Error;
 use carapax::methods::SendMessage;
 use carapax::Api;
 use log::info;
@@ -11,28 +9,21 @@ use trash_bot::trash_dates::{RequestPerformer, User};
 
 pub mod trash_dates;
 
-async fn get_message<T>(request_future: impl Future<Output = Result<Vec<T>, Error>>) -> String
+async fn get_message<T>(something: &[T]) -> String
 where
     T: ToString,
 {
-    let no_trash_message: String = String::from("No trash tomorrow!");
-
-    match request_future.await {
-        Ok(t) => {
-            if t.is_empty() {
-                no_trash_message
-            } else {
-                t.iter().map(ToString::to_string).collect()
-            }
-        }
-        Err(_) => no_trash_message,
+    if let [] = something {
+        "No trash tomorrow!".to_string()
+    } else {
+        something.iter().map(ToString::to_string).collect()
     }
 }
 
 async fn perform_tasks() {
     let request_performer = RequestPerformer::from_env();
 
-    let users: Vec<User> = match request_performer.get_active_users().await {
+    let users: Vec<User> = match request_performer.get_active_users_tomorrow().await {
         Ok(t) => t,
         Err(e) => {
             log::warn!("No users with active notifications found: {}", e);
@@ -42,15 +33,12 @@ async fn perform_tasks() {
 
     for user in users {
         tokio::spawn(async move {
-            let request_performer = RequestPerformer::from_env();
-
             let token = env::var("TELEGRAM_BOT_TOKEN").expect("TELEGRAM_BOT_TOKEN not set");
             let api: Api = Api::new(token).unwrap();
 
-            let future_result = request_performer.get_tomorrows_trash(user.client_id);
             api.execute(SendMessage::new(
                 user.client_id,
-                get_message(future_result).await,
+                get_message(&user.dates[..]).await,
             ))
             .await
             .unwrap();
@@ -72,7 +60,7 @@ async fn run() {
         tokio::time::sleep(Duration::from_secs(10)).await;
     }
 
-    // REst
+    // Rest
 
     // let mut dispatcher = Dispatcher::new(api.clone());
     // use carapax::{handler, types::Command, types::Message, HandlerResult};

@@ -1,6 +1,5 @@
 use std::env;
 use std::fmt::Formatter;
-use std::hash::Hash;
 
 use anyhow::Error;
 use chrono::NaiveDate;
@@ -14,7 +13,7 @@ pub struct InvalidDateError;
 
 type Date = chrono::NaiveDate;
 
-#[derive(Eq, PartialEq, Debug, Hash, Clone)]
+#[derive(Eq, PartialEq, Debug, Clone)]
 pub enum TrashType {
     Organic,
     Recycling,
@@ -22,11 +21,12 @@ pub enum TrashType {
     Miscellaneous,
 }
 
-#[derive(Eq, PartialEq, Debug, Hash, Clone)]
+#[derive(Eq, PartialEq, Debug, Clone)]
 pub struct User {
     first_name: String,
     last_name: String,
     pub client_id: i64,
+    pub dates: Vec<TrashDate>,
 }
 
 #[derive(GraphQLQuery, Debug)]
@@ -37,6 +37,15 @@ pub struct User {
     normalization = "rust"
 )]
 pub struct TomorrowForUser;
+
+#[derive(GraphQLQuery, Debug)]
+#[graphql(
+    schema_path = "graphql/schema.graphql",
+    query_path = "graphql/tomorrow_for_all.graphql",
+    response_derives = "Debug",
+    normalization = "rust"
+)]
+pub struct TomorrowForAll;
 
 #[derive(GraphQLQuery, Debug)]
 #[graphql(
@@ -54,7 +63,7 @@ pub struct RequestPerformer {
     client: Client,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub struct TrashDate {
     pub date: NaiveDate,
     pub trash_type: TrashType,
@@ -67,27 +76,50 @@ impl From<active_users::ActiveUsersUsers> for User {
             client_id: au.telegram_chat_id,
             first_name: au.first_name.unwrap_or_else(|| "".to_string()),
             last_name: au.last_name.unwrap_or_else(|| "".to_string()),
+            dates: Vec::new(),
+        }
+    }
+}
+
+impl From<tomorrow_for_all::TomorrowForAllUsers> for User {
+    fn from(au: tomorrow_for_all::TomorrowForAllUsers) -> Self {
+        User {
+            client_id: au.telegram_chat_id,
+            first_name: "".to_string(),
+            last_name: "".to_string(),
+            dates: au.dates.into_iter().map(TrashDate::from).collect(),
+        }
+    }
+}
+
+impl From<tomorrow_for_all::TomorrowForAllUsersDates> for TrashDate {
+    fn from(tat: tomorrow_for_all::TomorrowForAllUsersDates) -> Self {
+        TrashDate {
+            name: String::from(&tat.trash_type_by_trash_type.name[..]),
+            date: tat.date,
+            trash_type: TrashType::from(&tat.trash_type_by_trash_type.name[..]),
+        }
+    }
+}
+
+impl From<&str> for TrashType {
+    fn from(string: &str) -> Self {
+        match string {
+            "Bioabfall" => TrashType::Organic,
+            "Wertstoff" => TrashType::Recycling,
+            "Papier" => TrashType::Paper,
+            "Restmüll" => TrashType::Miscellaneous,
+            _ => panic!("Could not find the selected type of trash: {}", string),
         }
     }
 }
 
 impl From<tomorrow_for_user::TomorrowForUserDates> for TrashDate {
     fn from(tat: tomorrow_for_user::TomorrowForUserDates) -> Self {
-        let trash_type = match &tat.trash_type_by_trash_type.name[..] {
-            "Bioabfall" => TrashType::Organic,
-            "Wertstoff" => TrashType::Recycling,
-            "Papier" => TrashType::Paper,
-            "Restmüll" => TrashType::Miscellaneous,
-            _ => panic!(
-                "Could not find the selected type of trash: {}",
-                &tat.trash_type_by_trash_type.name[..]
-            ),
-        };
-
         TrashDate {
-            name: tat.trash_type_by_trash_type.name,
+            name: String::from(&tat.trash_type_by_trash_type.name[..]),
             date: tat.date,
-            trash_type,
+            trash_type: TrashType::from(&tat.trash_type_by_trash_type.name[..]),
         }
     }
 }
@@ -180,5 +212,30 @@ impl RequestPerformer {
             response_body.data.expect("no response data");
 
         Ok(response_data.users.into_iter().map(User::from).collect())
+    }
+
+    pub async fn get_active_users_tomorrow(&self) -> Result<Vec<User>, Error> {
+        // let variables: trash_at_date::Variables();
+        let request_body = TomorrowForAll::build_query(tomorrow_for_all::Variables {});
+
+        let response = self
+            .client
+            .post(&self.endpoint)
+            .header(HASURA_HEADER, &self.secret)
+            .json(&request_body)
+            .send()
+            .await?;
+
+        let response_body: Response<tomorrow_for_all::ResponseData> = response.json().await?;
+
+        self.log_errors(&response_body);
+
+        Ok(response_body
+            .data
+            .expect("no response data")
+            .users
+            .into_iter()
+            .map(User::from)
+            .collect())
     }
 }
