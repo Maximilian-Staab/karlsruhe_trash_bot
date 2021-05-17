@@ -1,5 +1,5 @@
 query ActiveUsers {
-    Users(where: {enabled_notifications: {_eq: true}}) {
+    users(where: {enabled_notifications: {_eq: true}}) {
         first_name
         last_name
         telegram_chat_id

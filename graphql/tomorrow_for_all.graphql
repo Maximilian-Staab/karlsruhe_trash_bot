@@ -1,0 +1,11 @@
+query TomorrowForAll {
+    users(where: {enabled_notifications: {_eq: true}}) {
+        dates(where: {date: {_eq: "tomorrow()"}}) {
+            date
+            trashTypeByTrashType {
+                name
+            }
+        }
+        telegram_chat_id
+    }
+}

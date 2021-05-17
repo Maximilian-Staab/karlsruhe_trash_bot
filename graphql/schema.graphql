@@ -44,8 +44,6 @@ columns and relationships of "dates"
 
 """
 type dates {
-  """An object relationship"""
-  User: Users!
   created_at: timestamptz!
   date: date!
   id: Int!
@@ -53,6 +51,9 @@ type dates {
   """An object relationship"""
   trashTypeByTrashType: trash_types!
   trash_type: Int!
+
+  """An object relationship"""
+  user: users!
   user_id: Int!
 }
 
@@ -128,7 +129,6 @@ input dates_avg_order_by {
 Boolean expression to filter rows from the table "dates". All fields are combined with a logical 'AND'.
 """
 input dates_bool_exp {
-  User: Users_bool_exp
   _and: [dates_bool_exp!]
   _not: dates_bool_exp
   _or: [dates_bool_exp!]
@@ -137,6 +137,7 @@ input dates_bool_exp {
   id: Int_comparison_exp
   trashTypeByTrashType: trash_types_bool_exp
   trash_type: Int_comparison_exp
+  user: users_bool_exp
   user_id: Int_comparison_exp
 }
 
@@ -164,12 +165,12 @@ input dates_inc_input {
 input type for inserting data into table "dates"
 """
 input dates_insert_input {
-  User: Users_obj_rel_insert_input
   created_at: timestamptz
   date: date
   id: Int
   trashTypeByTrashType: trash_types_obj_rel_insert_input
   trash_type: Int
+  user: users_obj_rel_insert_input
   user_id: Int
 }
 
@@ -235,12 +236,12 @@ input dates_on_conflict {
 
 """Ordering options when selecting data from "dates"."""
 input dates_order_by {
-  User: Users_order_by
   created_at: order_by
   date: order_by
   id: order_by
   trashTypeByTrashType: trash_types_order_by
   trash_type: order_by
+  user: users_order_by
   user_id: order_by
 }
 
@@ -430,19 +431,6 @@ input Int_comparison_exp {
 """mutation root"""
 type mutation_root {
   """
-  delete data from the table: "Users"
-  """
-  delete_Users(
-    """filter the rows which have to be deleted"""
-    where: Users_bool_exp!
-  ): Users_mutation_response
-
-  """
-  delete single row from the table: "Users"
-  """
-  delete_Users_by_pk(id: Int!): Users
-
-  """
   delete data from the table: "dates"
   """
   delete_dates(
@@ -482,26 +470,17 @@ type mutation_root {
   delete_trash_types_by_pk(id: Int!): trash_types
 
   """
-  insert data into the table: "Users"
+  delete data from the table: "users"
   """
-  insert_Users(
-    """the rows to be inserted"""
-    objects: [Users_insert_input!]!
-
-    """on conflict condition"""
-    on_conflict: Users_on_conflict
-  ): Users_mutation_response
+  delete_users(
+    """filter the rows which have to be deleted"""
+    where: users_bool_exp!
+  ): users_mutation_response
 
   """
-  insert a single row into the table: "Users"
+  delete single row from the table: "users"
   """
-  insert_Users_one(
-    """the row to be inserted"""
-    object: Users_insert_input!
-
-    """on conflict condition"""
-    on_conflict: Users_on_conflict
-  ): Users
+  delete_users_by_pk(id: Int!): users
 
   """
   insert data into the table: "dates"
@@ -570,30 +549,26 @@ type mutation_root {
   ): trash_types
 
   """
-  update data of the table: "Users"
+  insert data into the table: "users"
   """
-  update_Users(
-    """increments the numeric columns with given value of the filtered values"""
-    _inc: Users_inc_input
+  insert_users(
+    """the rows to be inserted"""
+    objects: [users_insert_input!]!
 
-    """sets the columns of the filtered rows to the given values"""
-    _set: Users_set_input
-
-    """filter the rows which have to be updated"""
-    where: Users_bool_exp!
-  ): Users_mutation_response
+    """on conflict condition"""
+    on_conflict: users_on_conflict
+  ): users_mutation_response
 
   """
-  update single row of the table: "Users"
+  insert a single row into the table: "users"
   """
-  update_Users_by_pk(
-    """increments the numeric columns with given value of the filtered values"""
-    _inc: Users_inc_input
+  insert_users_one(
+    """the row to be inserted"""
+    object: users_insert_input!
 
-    """sets the columns of the filtered rows to the given values"""
-    _set: Users_set_input
-    pk_columns: Users_pk_columns_input!
-  ): Users
+    """on conflict condition"""
+    on_conflict: users_on_conflict
+  ): users
 
   """
   update data of the table: "dates"
@@ -672,6 +647,32 @@ type mutation_root {
     _set: trash_types_set_input
     pk_columns: trash_types_pk_columns_input!
   ): trash_types
+
+  """
+  update data of the table: "users"
+  """
+  update_users(
+    """increments the numeric columns with given value of the filtered values"""
+    _inc: users_inc_input
+
+    """sets the columns of the filtered rows to the given values"""
+    _set: users_set_input
+
+    """filter the rows which have to be updated"""
+    where: users_bool_exp!
+  ): users_mutation_response
+
+  """
+  update single row of the table: "users"
+  """
+  update_users_by_pk(
+    """increments the numeric columns with given value of the filtered values"""
+    _inc: users_inc_input
+
+    """sets the columns of the filtered rows to the given values"""
+    _set: users_set_input
+    pk_columns: users_pk_columns_input!
+  ): users
 }
 
 """column ordering options"""
@@ -696,45 +697,6 @@ enum order_by {
 }
 
 type query_root {
-  """An array relationship"""
-  Users(
-    """distinct select on columns"""
-    distinct_on: [Users_select_column!]
-
-    """limit the number of rows returned"""
-    limit: Int
-
-    """skip the first n rows. Use only with order_by"""
-    offset: Int
-
-    """sort the rows by one or more columns"""
-    order_by: [Users_order_by!]
-
-    """filter the rows returned"""
-    where: Users_bool_exp
-  ): [Users!]!
-
-  """An aggregate relationship"""
-  Users_aggregate(
-    """distinct select on columns"""
-    distinct_on: [Users_select_column!]
-
-    """limit the number of rows returned"""
-    limit: Int
-
-    """skip the first n rows. Use only with order_by"""
-    offset: Int
-
-    """sort the rows by one or more columns"""
-    order_by: [Users_order_by!]
-
-    """filter the rows returned"""
-    where: Users_bool_exp
-  ): Users_aggregate!
-
-  """fetch data from the table: "Users" using primary key columns"""
-  Users_by_pk(id: Int!): Users
-
   """An array relationship"""
   dates(
     """distinct select on columns"""
@@ -909,6 +871,45 @@ type query_root {
 
   """fetch data from the table: "trash_types" using primary key columns"""
   trash_types_by_pk(id: Int!): trash_types
+
+  """An array relationship"""
+  users(
+    """distinct select on columns"""
+    distinct_on: [users_select_column!]
+
+    """limit the number of rows returned"""
+    limit: Int
+
+    """skip the first n rows. Use only with order_by"""
+    offset: Int
+
+    """sort the rows by one or more columns"""
+    order_by: [users_order_by!]
+
+    """filter the rows returned"""
+    where: users_bool_exp
+  ): [users!]!
+
+  """An aggregate relationship"""
+  users_aggregate(
+    """distinct select on columns"""
+    distinct_on: [users_select_column!]
+
+    """limit the number of rows returned"""
+    limit: Int
+
+    """skip the first n rows. Use only with order_by"""
+    offset: Int
+
+    """sort the rows by one or more columns"""
+    order_by: [users_order_by!]
+
+    """filter the rows returned"""
+    where: users_bool_exp
+  ): users_aggregate!
+
+  """fetch data from the table: "users" using primary key columns"""
+  users_by_pk(id: Int!): users
 }
 
 input search_streets_args {
@@ -919,46 +920,47 @@ input search_streets_args {
 columns and relationships of "streets"
 """
 type streets {
-  """An array relationship"""
-  Users(
-    """distinct select on columns"""
-    distinct_on: [Users_select_column!]
-
-    """limit the number of rows returned"""
-    limit: Int
-
-    """skip the first n rows. Use only with order_by"""
-    offset: Int
-
-    """sort the rows by one or more columns"""
-    order_by: [Users_order_by!]
-
-    """filter the rows returned"""
-    where: Users_bool_exp
-  ): [Users!]!
-
-  """An aggregate relationship"""
-  Users_aggregate(
-    """distinct select on columns"""
-    distinct_on: [Users_select_column!]
-
-    """limit the number of rows returned"""
-    limit: Int
-
-    """skip the first n rows. Use only with order_by"""
-    offset: Int
-
-    """sort the rows by one or more columns"""
-    order_by: [Users_order_by!]
-
-    """filter the rows returned"""
-    where: Users_bool_exp
-  ): Users_aggregate!
   created_at: timestamptz!
   id: Int!
   karlsruhe_id: Int!
   name: String!
   updated_at: timestamptz!
+
+  """An array relationship"""
+  users(
+    """distinct select on columns"""
+    distinct_on: [users_select_column!]
+
+    """limit the number of rows returned"""
+    limit: Int
+
+    """skip the first n rows. Use only with order_by"""
+    offset: Int
+
+    """sort the rows by one or more columns"""
+    order_by: [users_order_by!]
+
+    """filter the rows returned"""
+    where: users_bool_exp
+  ): [users!]!
+
+  """An aggregate relationship"""
+  users_aggregate(
+    """distinct select on columns"""
+    distinct_on: [users_select_column!]
+
+    """limit the number of rows returned"""
+    limit: Int
+
+    """skip the first n rows. Use only with order_by"""
+    offset: Int
+
+    """sort the rows by one or more columns"""
+    order_by: [users_order_by!]
+
+    """filter the rows returned"""
+    where: users_bool_exp
+  ): users_aggregate!
 }
 
 """
@@ -996,7 +998,6 @@ type streets_avg_fields {
 Boolean expression to filter rows from the table "streets". All fields are combined with a logical 'AND'.
 """
 input streets_bool_exp {
-  Users: Users_bool_exp
   _and: [streets_bool_exp!]
   _not: streets_bool_exp
   _or: [streets_bool_exp!]
@@ -1005,6 +1006,7 @@ input streets_bool_exp {
   karlsruhe_id: Int_comparison_exp
   name: String_comparison_exp
   updated_at: timestamptz_comparison_exp
+  users: users_bool_exp
 }
 
 """
@@ -1030,12 +1032,12 @@ input streets_inc_input {
 input type for inserting data into table "streets"
 """
 input streets_insert_input {
-  Users: Users_arr_rel_insert_input
   created_at: timestamptz
   id: Int
   karlsruhe_id: Int
   name: String
   updated_at: timestamptz
+  users: users_arr_rel_insert_input
 }
 
 """aggregate max on columns"""
@@ -1088,12 +1090,12 @@ input streets_on_conflict {
 
 """Ordering options when selecting data from "streets"."""
 input streets_order_by {
-  Users_aggregate: Users_aggregate_order_by
   created_at: order_by
   id: order_by
   karlsruhe_id: order_by
   name: order_by
   updated_at: order_by
+  users_aggregate: users_aggregate_order_by
 }
 
 """primary key columns input for table: streets"""
@@ -1249,45 +1251,6 @@ input String_comparison_exp {
 
 type subscription_root {
   """An array relationship"""
-  Users(
-    """distinct select on columns"""
-    distinct_on: [Users_select_column!]
-
-    """limit the number of rows returned"""
-    limit: Int
-
-    """skip the first n rows. Use only with order_by"""
-    offset: Int
-
-    """sort the rows by one or more columns"""
-    order_by: [Users_order_by!]
-
-    """filter the rows returned"""
-    where: Users_bool_exp
-  ): [Users!]!
-
-  """An aggregate relationship"""
-  Users_aggregate(
-    """distinct select on columns"""
-    distinct_on: [Users_select_column!]
-
-    """limit the number of rows returned"""
-    limit: Int
-
-    """skip the first n rows. Use only with order_by"""
-    offset: Int
-
-    """sort the rows by one or more columns"""
-    order_by: [Users_order_by!]
-
-    """filter the rows returned"""
-    where: Users_bool_exp
-  ): Users_aggregate!
-
-  """fetch data from the table: "Users" using primary key columns"""
-  Users_by_pk(id: Int!): Users
-
-  """An array relationship"""
   dates(
     """distinct select on columns"""
     distinct_on: [dates_select_column!]
@@ -1461,6 +1424,45 @@ type subscription_root {
 
   """fetch data from the table: "trash_types" using primary key columns"""
   trash_types_by_pk(id: Int!): trash_types
+
+  """An array relationship"""
+  users(
+    """distinct select on columns"""
+    distinct_on: [users_select_column!]
+
+    """limit the number of rows returned"""
+    limit: Int
+
+    """skip the first n rows. Use only with order_by"""
+    offset: Int
+
+    """sort the rows by one or more columns"""
+    order_by: [users_order_by!]
+
+    """filter the rows returned"""
+    where: users_bool_exp
+  ): [users!]!
+
+  """An aggregate relationship"""
+  users_aggregate(
+    """distinct select on columns"""
+    distinct_on: [users_select_column!]
+
+    """limit the number of rows returned"""
+    limit: Int
+
+    """skip the first n rows. Use only with order_by"""
+    offset: Int
+
+    """sort the rows by one or more columns"""
+    order_by: [users_order_by!]
+
+    """filter the rows returned"""
+    where: users_bool_exp
+  ): users_aggregate!
+
+  """fetch data from the table: "users" using primary key columns"""
+  users_by_pk(id: Int!): users
 }
 
 scalar timestamptz
@@ -1730,9 +1732,9 @@ type trash_types_variance_fields {
 }
 
 """
-columns and relationships of "Users"
+columns and relationships of "users"
 """
-type Users {
+type users {
   created_at: timestamptz!
 
   """An array relationship"""
@@ -1783,80 +1785,80 @@ type Users {
 }
 
 """
-aggregated selection of "Users"
+aggregated selection of "users"
 """
-type Users_aggregate {
-  aggregate: Users_aggregate_fields
-  nodes: [Users!]!
+type users_aggregate {
+  aggregate: users_aggregate_fields
+  nodes: [users!]!
 }
 
 """
-aggregate fields of "Users"
+aggregate fields of "users"
 """
-type Users_aggregate_fields {
-  avg: Users_avg_fields
-  count(columns: [Users_select_column!], distinct: Boolean): Int!
-  max: Users_max_fields
-  min: Users_min_fields
-  stddev: Users_stddev_fields
-  stddev_pop: Users_stddev_pop_fields
-  stddev_samp: Users_stddev_samp_fields
-  sum: Users_sum_fields
-  var_pop: Users_var_pop_fields
-  var_samp: Users_var_samp_fields
-  variance: Users_variance_fields
+type users_aggregate_fields {
+  avg: users_avg_fields
+  count(columns: [users_select_column!], distinct: Boolean): Int!
+  max: users_max_fields
+  min: users_min_fields
+  stddev: users_stddev_fields
+  stddev_pop: users_stddev_pop_fields
+  stddev_samp: users_stddev_samp_fields
+  sum: users_sum_fields
+  var_pop: users_var_pop_fields
+  var_samp: users_var_samp_fields
+  variance: users_variance_fields
 }
 
 """
-order by aggregate values of table "Users"
+order by aggregate values of table "users"
 """
-input Users_aggregate_order_by {
-  avg: Users_avg_order_by
+input users_aggregate_order_by {
+  avg: users_avg_order_by
   count: order_by
-  max: Users_max_order_by
-  min: Users_min_order_by
-  stddev: Users_stddev_order_by
-  stddev_pop: Users_stddev_pop_order_by
-  stddev_samp: Users_stddev_samp_order_by
-  sum: Users_sum_order_by
-  var_pop: Users_var_pop_order_by
-  var_samp: Users_var_samp_order_by
-  variance: Users_variance_order_by
+  max: users_max_order_by
+  min: users_min_order_by
+  stddev: users_stddev_order_by
+  stddev_pop: users_stddev_pop_order_by
+  stddev_samp: users_stddev_samp_order_by
+  sum: users_sum_order_by
+  var_pop: users_var_pop_order_by
+  var_samp: users_var_samp_order_by
+  variance: users_variance_order_by
 }
 
 """
-input type for inserting array relation for remote table "Users"
+input type for inserting array relation for remote table "users"
 """
-input Users_arr_rel_insert_input {
-  data: [Users_insert_input!]!
+input users_arr_rel_insert_input {
+  data: [users_insert_input!]!
 
   """on conflict condition"""
-  on_conflict: Users_on_conflict
+  on_conflict: users_on_conflict
 }
 
 """aggregate avg on columns"""
-type Users_avg_fields {
+type users_avg_fields {
   id: Float
   street: Float
   telegram_chat_id: Float
 }
 
 """
-order by avg() on columns of table "Users"
+order by avg() on columns of table "users"
 """
-input Users_avg_order_by {
+input users_avg_order_by {
   id: order_by
   street: order_by
   telegram_chat_id: order_by
 }
 
 """
-Boolean expression to filter rows from the table "Users". All fields are combined with a logical 'AND'.
+Boolean expression to filter rows from the table "users". All fields are combined with a logical 'AND'.
 """
-input Users_bool_exp {
-  _and: [Users_bool_exp!]
-  _not: Users_bool_exp
-  _or: [Users_bool_exp!]
+input users_bool_exp {
+  _and: [users_bool_exp!]
+  _not: users_bool_exp
+  _or: [users_bool_exp!]
   created_at: timestamptz_comparison_exp
   dates: dates_bool_exp
   enabled_notifications: Boolean_comparison_exp
@@ -1870,9 +1872,9 @@ input Users_bool_exp {
 }
 
 """
-unique or primary key constraints on table "Users"
+unique or primary key constraints on table "users"
 """
-enum Users_constraint {
+enum users_constraint {
   """unique or primary key constraint"""
   Users_pkey
 
@@ -1881,18 +1883,18 @@ enum Users_constraint {
 }
 
 """
-input type for incrementing numeric columns in table "Users"
+input type for incrementing numeric columns in table "users"
 """
-input Users_inc_input {
+input users_inc_input {
   id: Int
   street: Int
   telegram_chat_id: Int
 }
 
 """
-input type for inserting data into table "Users"
+input type for inserting data into table "users"
 """
-input Users_insert_input {
+input users_insert_input {
   created_at: timestamptz
   dates: dates_arr_rel_insert_input
   enabled_notifications: Boolean
@@ -1906,7 +1908,7 @@ input Users_insert_input {
 }
 
 """aggregate max on columns"""
-type Users_max_fields {
+type users_max_fields {
   created_at: timestamptz
   first_name: String
   house_number: String
@@ -1917,9 +1919,9 @@ type Users_max_fields {
 }
 
 """
-order by max() on columns of table "Users"
+order by max() on columns of table "users"
 """
-input Users_max_order_by {
+input users_max_order_by {
   created_at: order_by
   first_name: order_by
   house_number: order_by
@@ -1930,7 +1932,7 @@ input Users_max_order_by {
 }
 
 """aggregate min on columns"""
-type Users_min_fields {
+type users_min_fields {
   created_at: timestamptz
   first_name: String
   house_number: String
@@ -1941,9 +1943,9 @@ type Users_min_fields {
 }
 
 """
-order by min() on columns of table "Users"
+order by min() on columns of table "users"
 """
-input Users_min_order_by {
+input users_min_order_by {
   created_at: order_by
   first_name: order_by
   house_number: order_by
@@ -1954,37 +1956,37 @@ input Users_min_order_by {
 }
 
 """
-response of any mutation on the table "Users"
+response of any mutation on the table "users"
 """
-type Users_mutation_response {
+type users_mutation_response {
   """number of rows affected by the mutation"""
   affected_rows: Int!
 
   """data from the rows affected by the mutation"""
-  returning: [Users!]!
+  returning: [users!]!
 }
 
 """
-input type for inserting object relation for remote table "Users"
+input type for inserting object relation for remote table "users"
 """
-input Users_obj_rel_insert_input {
-  data: Users_insert_input!
+input users_obj_rel_insert_input {
+  data: users_insert_input!
 
   """on conflict condition"""
-  on_conflict: Users_on_conflict
+  on_conflict: users_on_conflict
 }
 
 """
-on conflict condition type for table "Users"
+on conflict condition type for table "users"
 """
-input Users_on_conflict {
-  constraint: Users_constraint!
-  update_columns: [Users_update_column!]! = []
-  where: Users_bool_exp
+input users_on_conflict {
+  constraint: users_constraint!
+  update_columns: [users_update_column!]! = []
+  where: users_bool_exp
 }
 
-"""Ordering options when selecting data from "Users"."""
-input Users_order_by {
+"""Ordering options when selecting data from "users"."""
+input users_order_by {
   created_at: order_by
   dates_aggregate: dates_aggregate_order_by
   enabled_notifications: order_by
@@ -1997,15 +1999,15 @@ input Users_order_by {
   telegram_chat_id: order_by
 }
 
-"""primary key columns input for table: Users"""
-input Users_pk_columns_input {
+"""primary key columns input for table: users"""
+input users_pk_columns_input {
   id: Int!
 }
 
 """
-select columns of table "Users"
+select columns of table "users"
 """
-enum Users_select_column {
+enum users_select_column {
   """column name"""
   created_at
 
@@ -2032,9 +2034,9 @@ enum Users_select_column {
 }
 
 """
-input type for updating data in table "Users"
+input type for updating data in table "users"
 """
-input Users_set_input {
+input users_set_input {
   created_at: timestamptz
   enabled_notifications: Boolean
   first_name: String
@@ -2046,73 +2048,73 @@ input Users_set_input {
 }
 
 """aggregate stddev on columns"""
-type Users_stddev_fields {
+type users_stddev_fields {
   id: Float
   street: Float
   telegram_chat_id: Float
 }
 
 """
-order by stddev() on columns of table "Users"
+order by stddev() on columns of table "users"
 """
-input Users_stddev_order_by {
+input users_stddev_order_by {
   id: order_by
   street: order_by
   telegram_chat_id: order_by
 }
 
 """aggregate stddev_pop on columns"""
-type Users_stddev_pop_fields {
+type users_stddev_pop_fields {
   id: Float
   street: Float
   telegram_chat_id: Float
 }
 
 """
-order by stddev_pop() on columns of table "Users"
+order by stddev_pop() on columns of table "users"
 """
-input Users_stddev_pop_order_by {
+input users_stddev_pop_order_by {
   id: order_by
   street: order_by
   telegram_chat_id: order_by
 }
 
 """aggregate stddev_samp on columns"""
-type Users_stddev_samp_fields {
+type users_stddev_samp_fields {
   id: Float
   street: Float
   telegram_chat_id: Float
 }
 
 """
-order by stddev_samp() on columns of table "Users"
+order by stddev_samp() on columns of table "users"
 """
-input Users_stddev_samp_order_by {
+input users_stddev_samp_order_by {
   id: order_by
   street: order_by
   telegram_chat_id: order_by
 }
 
 """aggregate sum on columns"""
-type Users_sum_fields {
+type users_sum_fields {
   id: Int
   street: Int
   telegram_chat_id: Int
 }
 
 """
-order by sum() on columns of table "Users"
+order by sum() on columns of table "users"
 """
-input Users_sum_order_by {
+input users_sum_order_by {
   id: order_by
   street: order_by
   telegram_chat_id: order_by
 }
 
 """
-update columns of table "Users"
+update columns of table "users"
 """
-enum Users_update_column {
+enum users_update_column {
   """column name"""
   created_at
 
@@ -2139,48 +2141,48 @@ enum Users_update_column {
 }
 
 """aggregate var_pop on columns"""
-type Users_var_pop_fields {
+type users_var_pop_fields {
   id: Float
   street: Float
   telegram_chat_id: Float
 }
 
 """
-order by var_pop() on columns of table "Users"
+order by var_pop() on columns of table "users"
 """
-input Users_var_pop_order_by {
+input users_var_pop_order_by {
   id: order_by
   street: order_by
   telegram_chat_id: order_by
 }
 
 """aggregate var_samp on columns"""
-type Users_var_samp_fields {
+type users_var_samp_fields {
   id: Float
   street: Float
   telegram_chat_id: Float
 }
 
 """
-order by var_samp() on columns of table "Users"
+order by var_samp() on columns of table "users"
 """
-input Users_var_samp_order_by {
+input users_var_samp_order_by {
   id: order_by
   street: order_by
   telegram_chat_id: order_by
 }
 
 """aggregate variance on columns"""
-type Users_variance_fields {
+type users_variance_fields {
   id: Float
   street: Float
   telegram_chat_id: Float
 }
 
 """
-order by variance() on columns of table "Users"
+order by variance() on columns of table "users"
 """
-input Users_variance_order_by {
+input users_variance_order_by {
   id: order_by
   street: order_by
   telegram_chat_id: order_by
