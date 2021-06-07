@@ -1,5 +1,4 @@
 use std::env;
-use std::future::Future;
 
 use crate::location_lookup::Lookup;
 use anyhow::Error;
@@ -16,28 +15,21 @@ use trash_bot::trash_dates::{RequestPerformer, User};
 mod location_lookup;
 pub mod trash_dates;
 
-async fn get_message<T>(request_future: impl Future<Output = Result<Vec<T>, Error>>) -> String
+async fn get_message<T>(something: &[T]) -> String
 where
     T: ToString,
 {
-    let no_trash_message: String = String::from("No trash tomorrow!");
-
-    match request_future.await {
-        Ok(t) => {
-            if t.is_empty() {
-                no_trash_message
-            } else {
-                t.iter().map(ToString::to_string).collect()
-            }
-        }
-        Err(_) => no_trash_message,
+    if let [] = something {
+        "No trash tomorrow!".to_string()
+    } else {
+        something.iter().map(ToString::to_string).collect()
     }
 }
 
 async fn perform_tasks() {
     let request_performer = RequestPerformer::from_env();
 
-    let users: Vec<User> = match request_performer.get_active_users().await {
+    let users: Vec<User> = match request_performer.get_active_users_tomorrow().await {
         Ok(t) => t,
         Err(e) => {
             log::warn!("No users with active notifications found: {}", e);

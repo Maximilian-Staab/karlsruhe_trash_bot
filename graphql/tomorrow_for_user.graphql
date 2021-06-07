@@ -1,8 +1,11 @@
 query TomorrowForUser($user_id: Int!) {
-    dates(where: {users_to_dates: {User: {telegram_chat_id: {_eq: $user_id}}}}) {
+    dates(where: {user_id: {_eq: $user_id}, date: {_eq: "tomorrow()"}}) {
         date
         trashTypeByTrashType {
             name
+        }
+        user {
+            telegram_chat_id
         }
     }
 }
