@@ -1,6 +1,6 @@
 use std::env;
 
-use crate::location_lookup::Lookup;
+use crate::location_lookup::{LocationResult, Lookup};
 use anyhow::Error;
 use carapax::methods::SendMessage;
 use carapax::types::{KeyboardButton, ReplyKeyboardMarkup, ReplyMarkup};
@@ -45,10 +45,18 @@ async fn perform_tasks() {
             let api: Api = Api::new(token).unwrap();
 
             let user_id = user.client_id;
-            let future_result = request_performer.get_tomorrows_trash(user_id);
-            api.execute(SendMessage::new(user_id, get_message(future_result).await))
-                .await
-                .unwrap();
+            match request_performer.get_tomorrows_trash(user_id).await {
+                Ok(t) => {
+                    api.execute(SendMessage::new(user_id, get_message(&t).await))
+                        .await
+                        .unwrap();
+                }
+                Err(e) => log::error!(
+                    "Could not trash information for user: {}, Error: {}",
+                    user_id,
+                    e
+                ),
+            };
         });
     }
 }
@@ -126,7 +134,7 @@ async fn run() {
         if let carapax::types::MessageData::Location(location) = message_data {
             let location = *location;
 
-            let (tx, rx) = oneshot::channel::<Result<Option<AddressDetails>, Error>>();
+            let (tx, rx) = oneshot::channel::<Result<Option<LocationResult>, Error>>();
 
             let send_result = _context
                 .sender
@@ -154,12 +162,16 @@ async fn run() {
                         }
                     };
 
+                    let result = match result {
+                        Some(t) => format!("Is this your location? {}", t),
+                        None => {
+                            "Could not find a street name to your location, please enter the location manually.".to_string()
+                        }
+                    };
+
                     _context
                         .api
-                        .execute(SendMessage::new(
-                            _message.get_chat_id(),
-                            format!("Is this your location? {:?}", result),
-                        ))
+                        .execute(SendMessage::new(_message.get_chat_id(), result))
                         .await
                         .unwrap();
                 }

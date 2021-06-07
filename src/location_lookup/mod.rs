@@ -1,9 +1,10 @@
-use std::fmt::Display;
+use std::fmt::{Display, Formatter};
 
 use anyhow::{Error, Result};
 use geocoding::openstreetmap::{AddressDetails, OpenstreetmapResponse};
 use geocoding::{DetailedReverse, Openstreetmap, Point};
 use reqwest::header::{HeaderMap, HeaderValue, USER_AGENT};
+use std::ptr::write_bytes;
 use tokio::sync::mpsc::Receiver;
 use tokio::sync::oneshot;
 
@@ -14,7 +15,7 @@ pub struct Lookup {
     pub longitude: f32,
     pub latitude: f32,
 
-    pub responder: Responder<Option<AddressDetails>>,
+    pub responder: Responder<Option<LocationResult>>,
 }
 
 impl Display for Lookup {
@@ -29,24 +30,30 @@ impl Display for Lookup {
 }
 
 #[derive(Debug)]
-struct LocationResult {
+pub struct LocationResult {
     street: String,
-    house_number: u32,
+    house_number: Option<u32>,
     city: String,
     country: String,
 }
 
+impl Display for LocationResult {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let r = write!(f, "{}, {}", self.city, self.street);
+        if let Some(number) = self.house_number {
+            return write!(f, " {}", number);
+        }
+        return r;
+    }
+}
+
 pub struct LocationLookup {
     receiver: Receiver<Lookup>,
-    osm: Openstreetmap,
 }
 
 impl LocationLookup {
     pub async fn new(receiver: Receiver<Lookup>) -> LocationLookup {
-        LocationLookup {
-            receiver,
-            osm: Openstreetmap::new(),
-        }
+        LocationLookup { receiver }
     }
 
     // async fn request(&self, longitude: f32, latitude: f32) -> Result<AddressDetails, Error> {
@@ -71,9 +78,17 @@ impl LocationLookup {
         log::info!("Starting Lookup Service");
         while let Some(lookup) = self.receiver.recv().await {
             log::info!("Got Lookup Request: {}", lookup);
-            let result = self
-                .osm
-                .detailed_reverse(&Point::new(lookup.longitude, lookup.latitude));
+
+            let longitude = lookup.longitude.clone();
+            let latitude = lookup.latitude.clone();
+            let result = tokio::task::spawn_blocking(move || {
+                Openstreetmap::new().detailed_reverse(&Point::new(longitude, latitude))
+            })
+            .await
+            .expect("Task didn't finish.");
+            // let result = self
+            //     .osm
+            //     .detailed_reverse(&Point::new(lookup.longitude, lookup.latitude));
 
             if let Err(e) = result {
                 lookup.responder.send(Err(Error::from(e))).unwrap();
@@ -81,7 +96,16 @@ impl LocationLookup {
             }
 
             if let Some(address) = result.unwrap() {
-                lookup.responder.send(Ok(Some(address))).unwrap();
+                let result = LocationResult {
+                    city: address.city.unwrap_or("".to_string()),
+                    country: address.country.unwrap_or("".to_string()),
+                    house_number: match address.house_number {
+                        None => None,
+                        Some(n) => Some(n.parse().unwrap()),
+                    },
+                    street: address.road.unwrap_or("".to_string()),
+                };
+                lookup.responder.send(Ok(Some(result))).unwrap();
             } else {
                 log::warn!("Didn't find anything: {}", lookup);
 
