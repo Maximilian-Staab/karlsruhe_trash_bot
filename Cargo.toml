@@ -17,7 +17,8 @@ anyhow = "1.0.40"
 log = "0.4.14"
 env_logger = "0.8.3"
 futures = "0.3.14"
-carapax = "0.10.0"
+carapax = { version = "0.10.0", features = ["ratelimit", "dialogue", "session-fs"] }
 geocoding = { version = "0.3.2", default-features = false, featues = ["rustls-tls"], git = "https://github.com/Maximilian-Staab/geocoding" }
 clokwerk = "0.4.0-rc1"
 num-traits = "0.2.14"
+tempfile = "3.2.0"
