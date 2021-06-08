@@ -4,7 +4,9 @@ use anyhow::{Error, Result};
 use geocoding::openstreetmap::{AddressDetails, OpenstreetmapResponse};
 use geocoding::{DetailedReverse, Openstreetmap, Point};
 use reqwest::header::{HeaderMap, HeaderValue, USER_AGENT};
+use serde::{Deserialize, Serialize};
 use std::ptr::write_bytes;
+use std::time::Duration;
 use tokio::sync::mpsc::Receiver;
 use tokio::sync::oneshot;
 
@@ -29,7 +31,7 @@ impl Display for Lookup {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct LocationResult {
     street: String,
     house_number: Option<u32>,
@@ -86,31 +88,29 @@ impl LocationLookup {
             })
             .await
             .expect("Task didn't finish.");
-            // let result = self
-            //     .osm
-            //     .detailed_reverse(&Point::new(lookup.longitude, lookup.latitude));
 
             if let Err(e) = result {
                 lookup.responder.send(Err(Error::from(e))).unwrap();
-                continue;
-            }
-
-            if let Some(address) = result.unwrap() {
-                let result = LocationResult {
-                    city: address.city.unwrap_or("".to_string()),
-                    country: address.country.unwrap_or("".to_string()),
-                    house_number: match address.house_number {
-                        None => None,
-                        Some(n) => Some(n.parse().unwrap()),
-                    },
-                    street: address.road.unwrap_or("".to_string()),
-                };
-                lookup.responder.send(Ok(Some(result))).unwrap();
             } else {
-                log::warn!("Didn't find anything: {}", lookup);
-
-                lookup.responder.send(Ok(None)).unwrap();
+                if let Some(address) = result.unwrap() {
+                    let result = LocationResult {
+                        city: address.city.unwrap_or("".to_string()),
+                        country: address.country.unwrap_or("".to_string()),
+                        house_number: match address.house_number {
+                            None => None,
+                            Some(n) => Some(n.parse().unwrap()),
+                        },
+                        street: address.road.unwrap_or("".to_string()),
+                    };
+                    log::info!("Found location: {}", result);
+                    lookup.responder.send(Ok(Some(result))).unwrap();
+                } else {
+                    log::warn!("Didn't find anything: {}", lookup);
+                    lookup.responder.send(Ok(None)).unwrap();
+                }
             }
+
+            tokio::time::sleep(Duration::from_secs(1u64)).await;
         }
         log::info!("Stopping Lookup Service");
     }
