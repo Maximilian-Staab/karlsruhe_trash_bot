@@ -1,6 +1,0 @@
-query SearchStreet($name: String) {
-    search_streets(args: {search: $name}) {
-        id
-        name
-    }
-}
