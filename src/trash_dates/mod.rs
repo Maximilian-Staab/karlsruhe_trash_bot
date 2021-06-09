@@ -2,9 +2,11 @@ use std::env;
 use std::fmt::Formatter;
 
 use anyhow::Error;
-use chrono::NaiveDate;
+use chrono::{NaiveDate, Utc};
 use graphql_client::{GraphQLQuery, Response};
 use reqwest::Client;
+use serde::de::DeserializeOwned;
+use serde::Serialize;
 
 static HASURA_HEADER: &str = "x-hasura-admin-secret";
 
@@ -12,6 +14,7 @@ static HASURA_HEADER: &str = "x-hasura-admin-secret";
 pub struct InvalidDateError;
 
 type Date = chrono::NaiveDate;
+type Timestamptz = chrono::DateTime<Utc>;
 
 #[derive(Eq, PartialEq, Debug, Clone)]
 pub enum TrashType {
@@ -41,6 +44,15 @@ pub struct TomorrowForUser;
 #[derive(GraphQLQuery, Debug)]
 #[graphql(
     schema_path = "graphql/schema.graphql",
+    query_path = "graphql/search_street.graphql",
+    response_derives = "Debug",
+    normalization = "rust"
+)]
+pub struct SearchStreet;
+
+#[derive(GraphQLQuery, Debug)]
+#[graphql(
+    schema_path = "graphql/schema.graphql",
     query_path = "graphql/tomorrow_for_all.graphql",
     response_derives = "Debug",
     normalization = "rust"
@@ -56,6 +68,24 @@ pub struct TomorrowForAll;
 )]
 pub struct ActiveUsers;
 
+#[derive(GraphQLQuery, Debug)]
+#[graphql(
+    schema_path = "graphql/schema.graphql",
+    query_path = "graphql/add_user.graphql",
+    response_derives = "Debug",
+    normalization = "rust"
+)]
+pub struct AddUser;
+
+#[derive(GraphQLQuery, Debug)]
+#[graphql(
+    schema_path = "graphql/schema.graphql",
+    query_path = "graphql/set_notification.graphql",
+    response_derives = "Debug",
+    normalization = "rust"
+)]
+pub struct SetNotification;
+
 #[derive(Debug, Clone)]
 pub struct RequestPerformer {
     secret: String,
@@ -68,6 +98,21 @@ pub struct TrashDate {
     pub date: NaiveDate,
     pub trash_type: TrashType,
     pub name: String,
+}
+
+#[derive(Debug, Serialize)]
+pub struct Street {
+    pub street: String,
+    pub id: i64,
+}
+
+impl From<search_street::SearchStreetSearchStreets> for Street {
+    fn from(ss: search_street::SearchStreetSearchStreets) -> Self {
+        Street {
+            street: ss.name,
+            id: ss.id,
+        }
+    }
 }
 
 impl From<active_users::ActiveUsersUsers> for User {
@@ -134,7 +179,7 @@ impl std::fmt::Display for User {
     fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
         write!(
             f,
-            "{} {}: {}",
+            "{} {}: {:?}",
             self.first_name, self.last_name, self.client_id
         )
     }
@@ -161,29 +206,16 @@ impl RequestPerformer {
     pub async fn get_tomorrows_trash(&self, user_id: i64) -> Result<Vec<TrashDate>, Error> {
         // let variables: trash_at_date::Variables();
         let request_body = TomorrowForUser::build_query(tomorrow_for_user::Variables { user_id });
+        let response_data: tomorrow_for_user::ResponseData = self.send_request(&request_body).await;
 
-        let response = self
-            .client
-            .post(&self.endpoint)
-            .header(HASURA_HEADER, &self.secret)
-            .json(&request_body)
-            .send()
-            .await?;
-
-        let response_body: Response<tomorrow_for_user::ResponseData> = response.json().await?;
-
-        self.log_errors(&response_body);
-
-        Ok(response_body
-            .data
-            .expect("no response data")
+        Ok(response_data
             .dates
             .into_iter()
             .map(TrashDate::from)
             .collect())
     }
 
-    fn log_errors<T>(&self, response: &Response<T>) {
+    fn log_errors<T>(&self, response: Response<T>) -> Option<T> {
         if let Some(errors) = &response.errors {
             log::error!("Something failed!");
 
@@ -191,25 +223,86 @@ impl RequestPerformer {
                 log::error!("{:?}", error);
             }
         }
+        response.data
+    }
+
+    pub async fn get_street_id(&self, street_name: String) -> Option<i64> {
+        let response_body = SearchStreet::build_query(search_street::Variables {
+            limit: Some(1i64),
+            name: Some(street_name),
+        });
+        let result: search_street::ResponseData = self.send_request(&response_body).await;
+        Some(result.search_streets.into_iter().next().unwrap().id)
+    }
+
+    pub async fn search_similar_streets(&self, street_name: String) -> Option<Vec<Street>> {
+        let response_body = SearchStreet::build_query(search_street::Variables {
+            limit: Some(1i64),
+            name: Some(street_name),
+        });
+        let result: search_street::ResponseData = self.send_request(&response_body).await;
+        Some(
+            result
+                .search_streets
+                .into_iter()
+                .map(Street::from)
+                .collect(),
+        )
+    }
+
+    pub async fn add_user(
+        &self,
+        first_name: Option<String>,
+        last_name: Option<String>,
+        telegram_chat_id: i64,
+        street: i64,
+        house_number: Option<String>,
+    ) {
+        let response_body = AddUser::build_query(add_user::Variables {
+            last_name,
+            first_name,
+            telegram_chat_id: Some(telegram_chat_id),
+            street: Some(street),
+            house_number,
+        });
+
+        self.send_request::<graphql_client::QueryBody<add_user::Variables>, add_user::ResponseData>(&response_body).await;
+    }
+
+    async fn send_request<T: Serialize + ?Sized, R: DeserializeOwned>(&self, json: &T) -> R {
+        self.log_errors(
+            self.client
+                .post(&self.endpoint)
+                .header(HASURA_HEADER, &self.secret)
+                .json(json)
+                .send()
+                .await
+                .unwrap()
+                .json::<graphql_client::Response<R>>()
+                .await
+                .unwrap(),
+        )
+        .expect("No response Data")
+    }
+
+    pub async fn set_notification(
+        &self,
+        telegram_chat_id: Option<i64>,
+        notifications: Option<bool>,
+    ) {
+        let response_body = SetNotification::build_query(set_notification::Variables {
+            telegram_chat_id,
+            notifications,
+        });
+
+        self.send_request::<graphql_client::QueryBody<set_notification::Variables>, set_notification::ResponseData>(
+            &response_body,
+        ).await;
     }
 
     pub async fn get_active_users(&self) -> Result<Vec<User>, Error> {
         let response_body = ActiveUsers::build_query(active_users::Variables {});
-
-        let response = self
-            .client
-            .post(&self.endpoint)
-            .header(HASURA_HEADER, &self.secret)
-            .json(&response_body)
-            .send()
-            .await?;
-
-        let response_body: Response<active_users::ResponseData> = response.json().await?;
-
-        self.log_errors(&response_body);
-
-        let response_data: active_users::ResponseData =
-            response_body.data.expect("no response data");
+        let response_data: active_users::ResponseData = self.send_request(&response_body).await;
 
         Ok(response_data.users.into_iter().map(User::from).collect())
     }
@@ -217,25 +310,8 @@ impl RequestPerformer {
     pub async fn get_active_users_tomorrow(&self) -> Result<Vec<User>, Error> {
         // let variables: trash_at_date::Variables();
         let request_body = TomorrowForAll::build_query(tomorrow_for_all::Variables {});
+        let response_data: tomorrow_for_all::ResponseData = self.send_request(&request_body).await;
 
-        let response = self
-            .client
-            .post(&self.endpoint)
-            .header(HASURA_HEADER, &self.secret)
-            .json(&request_body)
-            .send()
-            .await?;
-
-        let response_body: Response<tomorrow_for_all::ResponseData> = response.json().await?;
-
-        self.log_errors(&response_body);
-
-        Ok(response_body
-            .data
-            .expect("no response data")
-            .users
-            .into_iter()
-            .map(User::from)
-            .collect())
+        Ok(response_data.users.into_iter().map(User::from).collect())
     }
 }

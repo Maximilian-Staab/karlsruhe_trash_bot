@@ -1,11 +1,8 @@
 use std::fmt::{Display, Formatter};
 
 use anyhow::{Error, Result};
-use geocoding::openstreetmap::{AddressDetails, OpenstreetmapResponse};
 use geocoding::{DetailedReverse, Openstreetmap, Point};
-use reqwest::header::{HeaderMap, HeaderValue, USER_AGENT};
 use serde::{Deserialize, Serialize};
-use std::ptr::write_bytes;
 use std::time::Duration;
 use tokio::sync::mpsc::Receiver;
 use tokio::sync::oneshot;
@@ -33,16 +30,16 @@ impl Display for Lookup {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct LocationResult {
-    street: String,
-    house_number: Option<u32>,
-    city: String,
-    country: String,
+    pub street: String,
+    pub house_number: Option<String>,
+    pub city: String,
+    pub country: String,
 }
 
 impl Display for LocationResult {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         let r = write!(f, "{}, {}", self.city, self.street);
-        if let Some(number) = self.house_number {
+        if let Some(number) = &self.house_number {
             return write!(f, " {}", number);
         }
         return r;
