@@ -1,16 +1,9 @@
 use std::env;
 
 use crate::bot_logic::Bot;
-use crate::location_lookup::{LocationResult, Lookup};
-use anyhow::Error;
 use carapax::methods::SendMessage;
-use carapax::types::{KeyboardButton, ReplyKeyboardMarkup, ReplyMarkup};
 use carapax::Api;
-use geocoding::openstreetmap::AddressDetails;
-use location_lookup::LocationLookup;
 use log::info;
-use tokio::sync::{mpsc, oneshot};
-use tokio::time::Duration;
 use trash_bot::trash_dates::{RequestPerformer, User};
 
 mod bot_logic;
