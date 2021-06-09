@@ -6,7 +6,7 @@ use chrono::{NaiveDate, Utc};
 use graphql_client::{GraphQLQuery, Response};
 use reqwest::Client;
 use serde::de::DeserializeOwned;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 static HASURA_HEADER: &str = "x-hasura-admin-secret";
 
@@ -100,7 +100,7 @@ pub struct TrashDate {
     pub name: String,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct Street {
     pub street: String,
     pub id: i64,
@@ -237,7 +237,7 @@ impl RequestPerformer {
 
     pub async fn search_similar_streets(&self, street_name: String) -> Option<Vec<Street>> {
         let response_body = SearchStreet::build_query(search_street::Variables {
-            limit: Some(1i64),
+            limit: Some(5i64),
             name: Some(street_name),
         });
         let result: search_street::ResponseData = self.send_request(&response_body).await;
