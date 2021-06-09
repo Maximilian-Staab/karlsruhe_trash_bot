@@ -1,0 +1,6 @@
+query SearchStreet($name: String, $limit: Int) {
+    search_streets(args: {search: $name}, limit: $limit) {
+        id
+        name
+    }
+}
