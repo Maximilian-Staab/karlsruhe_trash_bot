@@ -1,3 +1,4 @@
+use crate::bot_logic::question_helpers::LocationQuestion;
 use crate::location_lookup::{LocationLookup, LocationResult, Lookup};
 use anyhow::Error;
 use carapax::{
@@ -24,11 +25,13 @@ use carapax::{
 use graphql_client::PathFragment::Key;
 use serde::{Deserialize, Serialize};
 use serde_json::de::Read;
-use std::convert::Infallible;
+use std::convert::{Infallible, TryInto};
 use std::env;
+use std::str::FromStr;
 use std::time::Duration;
 use tempfile::tempdir;
 use tokio::sync::mpsc;
+use trash_bot::trash_dates::{RequestPerformer, Street};
 
 #[derive(Serialize, Deserialize)]
 enum States {
@@ -36,6 +39,7 @@ enum States {
     MainMenu,
     Search,
     SearchManually,
+    SearchManuallyHouseNumber,
     SearchAskIfOk,
     Add,
     Remove,
@@ -53,18 +57,31 @@ mod question_helpers {
         AllFalse,
     }
 
-    static CORRECT: &str = "Ja, beides stimmt!";
-    static NUMBER_FALSE: &str = "Nein, die Hausnummer stimmt nicht!";
-    static ALL_FALSE: &str = "Nein, beides ist falsch!";
+    const CORRECT: &str = "Ja, beides stimmt!";
+    const NUMBER_FALSE: &str = "Nein, die Hausnummer stimmt nicht!";
+    const ALL_FALSE: &str = "Nein, beides ist falsch!";
 
     impl std::fmt::Display for LocationQuestion {
         fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
             match self {
-                self::LocationQuestion::Correct => write!(f, "Ja, beides stimmt!"),
+                self::LocationQuestion::Correct => write!(f, "{}", CORRECT),
                 self::LocationQuestion::NumberFalse => {
-                    write!(f, "Nein, die Hausnummer stimmt nicht!")
+                    write!(f, "{}", NUMBER_FALSE)
                 }
-                self::LocationQuestion::AllFalse => write!(f, "Nein, beides ist falsch!"),
+                self::LocationQuestion::AllFalse => write!(f, "{}", ALL_FALSE),
+            }
+        }
+    }
+
+    impl FromStr for LocationQuestion {
+        type Err = String;
+
+        fn from_str(s: &str) -> Result<Self, Self::Err> {
+            match s {
+                CORRECT => Ok(Self::Correct),
+                NUMBER_FALSE => Ok(Self::NumberFalse),
+                ALL_FALSE => Ok(Self::AllFalse),
+                _ => Err(format!("Could not convert to LocationQuestion: {}", s)),
             }
         }
     }
@@ -74,17 +91,17 @@ mod question_helpers {
         Search,
     }
 
-    static SEARCH: &str = "Straße auswählen/ändern";
-    static NOTIFICATION: &str = "Benachrichtigungen ein-/ausschalten";
+    const SEARCH: &str = "Straße auswählen/ändern";
+    const NOTIFICATION: &str = "Benachrichtigungen ein-/ausschalten";
 
     impl std::fmt::Display for MainMenuQuestion {
         fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
             match self {
                 self::MainMenuQuestion::ToggleNotifications => {
-                    write!(f, NOTIFICATION)
+                    write!(f, "{}", NOTIFICATION)
                 }
                 self::MainMenuQuestion::Search => {
-                    write!(f, SEARCH)
+                    write!(f, "{}", SEARCH)
                 }
             }
         }
@@ -114,6 +131,7 @@ pub struct Bot {}
 struct Context {
     api: Api,
     session_manager: SessionManager<FilesystemBackend>,
+    request_performer: RequestPerformer,
     sender: mpsc::Sender<Lookup>,
 }
 
@@ -145,25 +163,24 @@ async fn bot_dialogue(
 
     let chat_id = input.get_chat_id();
     let user = input.get_user().unwrap();
-    let first_name = &user.first_name[..];
-    let last_name = match user.last_name.as_ref() {
-        Some(t) => &t[..],
-        None => "",
-    };
+    let first_name = Some(user.first_name.clone());
+    let last_name = user.last_name.clone();
     let mut session = context.session_manager.get_session(&input).unwrap();
 
     Ok(match state {
         Start => {
             context
                 .api
-                .execute(SendMessage::new(chat_id, format!("Hallo {}!", first_name)))
-                .await
-                .unwrap();
-
-            context
-                .api
                 .execute(
-                    SendMessage::new(chat_id, "Was möchtest du tun?").reply_markup(
+                    SendMessage::new(
+                        chat_id,
+                        format!(
+                            "Hallo{}{}!\nWas möchtest du tun?",
+                            if first_name.is_some() { " " } else { "" },
+                            first_name.as_deref().unwrap_or("")
+                        ),
+                    )
+                    .reply_markup(
                         ReplyKeyboardMarkup::from(vec![
                             vec![KeyboardButton::new(
                                 question_helpers::MainMenuQuestion::ToggleNotifications.to_string(),
@@ -182,6 +199,7 @@ async fn bot_dialogue(
         }
         Search => {
             log::info!("Handling search dialog.");
+
             match input.data {
                 Location(location) => {
                     log::info!("Found location, ask the user if it's correct.");
@@ -225,17 +243,114 @@ async fn bot_dialogue(
                         .unwrap();
                     Next(SearchAskIfOk)
                 }
-                Text(t) => Next(SearchManually),
+                Text(_) => {
+                    context
+                        .api
+                        .execute(SendMessage::new(
+                            chat_id,
+                            "Gib den Namen deiner Straße ein, um Vorschläge zu erhalten.",
+                        ))
+                        .await
+                        .unwrap();
+                    Next(SearchManually)
+                }
                 _ => Next(Start),
             }
         }
-        SearchManually => Next(Start),
-        SearchAskIfOk => Next(Start),
+        SearchManually => {
+            if let Text(street_request) = input.data {
+                let search_results = context
+                    .request_performer
+                    .search_similar_streets(street_request.data)
+                    .await
+                    .unwrap();
+
+                session.set("street_search", &search_results);
+
+                let mut reply_keyboard_rows: Vec<Vec<KeyboardButton>> =
+                    Vec::with_capacity(search_results.len());
+
+                for street in search_results {
+                    reply_keyboard_rows.push(vec![KeyboardButton::new(street.street)]);
+                }
+            }
+            Next(Start)
+        }
+        SearchManuallyHouseNumber => Next(Start),
+        SearchAskIfOk => {
+            match input.data {
+                Text(t) => {
+                    match question_helpers::LocationQuestion::from_str(&t.data).unwrap() {
+                        LocationQuestion::Correct => {
+                            context
+                        .api
+                        .execute(SendMessage::new(
+                            chat_id,
+                            "Speichere deinen Standort fuer die Abfrage der Müllabholdaten.",
+                        ))
+                        .await
+                        .unwrap();
+
+                            let location: LocationResult =
+                                session.get("location").await.unwrap().unwrap();
+                            let has_street_id = context
+                                .request_performer
+                                .get_street_id(location.street)
+                                .await;
+
+                            match has_street_id {
+                                Some(street_id) => {
+                                    context
+                                        .request_performer
+                                        .add_user(
+                                            first_name,
+                                            last_name,
+                                            chat_id,
+                                            street_id,
+                                            location.house_number,
+                                        )
+                                        .await;
+                                    context.api.execute(SendMessage::new(
+                                        chat_id,
+                                        "Addresse hinzugefügt!",
+                                    ));
+
+                                    Next(Start)
+                                }
+                                None => {
+                                    context.api.execute(SendMessage::new(chat_id, "Konnte deine Straße nicht in der Datenbank finden. Bitte gib den Namen deiner Straße ein um Vorschläge anzuzeigen:",)).await.unwrap();
+
+                                    Next(SearchManually)
+                                }
+                            }
+                        }
+                        LocationQuestion::NumberFalse => {
+                            context
+                                .api
+                                .execute(SendMessage::new(
+                                    chat_id,
+                                    "Bitte gib die Hausnummer an, die du verwenden willst:",
+                                ))
+                                .await
+                                .unwrap();
+
+                            Next(SearchManuallyHouseNumber)
+                        }
+                        LocationQuestion::AllFalse => {
+                            context.api.execute(SendMessage::new(chat_id, "Bitte gib den Namen deiner Straße ein um Vorschläge anzuzeigen:")).await.unwrap();
+
+                            Next(SearchManually)
+                        }
+                    }
+                }
+                _ => Next(Start),
+            }
+        }
         Add => Next(Start),
         Remove => Next(Start),
         ToggleNotifications => Next(Start),
         MainMenu => match input.data {
-            Text(t) => match question_helpers::MainMenuQuestion::from(t.data) {
+            Text(t) => match question_helpers::MainMenuQuestion::from_str(&t.data).unwrap() {
                 question_helpers::MainMenuQuestion::Search => {
                     log::info!("Starting search dialog.");
 
@@ -283,6 +398,7 @@ impl Bot {
             session_manager: session_manager.clone(),
             api: api.clone(),
             sender: lookup_request_sender.clone(),
+            request_performer: RequestPerformer::from_env(),
         });
 
         let (capacity, interval) = (nonzero!(1u32), Duration::from_secs(5));
@@ -296,6 +412,6 @@ impl Bot {
 
         dispatcher.add_handler(Dialogue::new(session_manager, dialogue_name, bot_dialogue));
 
-        let thing = LongPoll::new(api, dispatcher).run().await;
+        LongPoll::new(api, dispatcher).run().await;
     }
 }
