@@ -216,44 +216,74 @@ async fn bot_dialogue(
                 Location(location) => {
                     log::info!("Found location, ask the user if it's correct.");
 
-                    let location_result = get_reverse_location(&location, &context.sender).await;
-                    if let Err(e) = location_result {
-                        log::warn!("Could not find reverse location: {}", e);
-                        context.api.execute(SendMessage::new(chat_id, "Konte deinen Standort nicht zuordnen, bitte gib deine Addresse manuel ein.")).await.unwrap();
-                        return Ok(Next(SearchManually));
+                    match get_reverse_location(&location, &context.sender).await {
+                        Err(e) => {
+                            log::warn!("Could not find reverse location: {}", e);
+                            context.api.execute(SendMessage::new(chat_id, "Konte deinen Standort nicht zuordnen, bitte gib deine Addresse manuel ein.")).await.unwrap();
+                            Next(SearchManually)
+                        }
+                        Ok(location_result) => {
+                            session.set("location", &location_result).await.unwrap();
+
+                            match context
+                                .request_performer
+                                .get_street_id(location_result.street.clone())
+                                .await
+                            {
+                                Some(street_id) => {
+                                    session.set("street_id", &street_id).await.unwrap();
+                                    session
+                                        .set("street_number", &location_result.house_number)
+                                        .await
+                                        .unwrap();
+
+                                    context
+                                        .api
+                                        .execute(
+                                            SendMessage::new(
+                                                chat_id,
+                                                format!(
+                                                    "Ist das die korrekte Straße und Hausnummer? *{}*",
+                                                    location_result
+                                                ),
+                                            )
+                                                .reply_markup(
+                                                    ReplyKeyboardMarkup::from(vec![
+                                                        vec![KeyboardButton::new(
+                                                            question_helpers::LocationQuestion::Correct
+                                                                .to_string(),
+                                                        )],
+                                                        vec![KeyboardButton::new(
+                                                            question_helpers::LocationQuestion::NumberFalse
+                                                                .to_string(),
+                                                        )],
+                                                        vec![KeyboardButton::new(
+                                                            question_helpers::LocationQuestion::AllFalse
+                                                                .to_string(),
+                                                        )],
+                                                    ])
+                                                        .one_time_keyboard(true)
+                                                        .resize_keyboard(true),
+                                                )
+                                                .parse_mode(Markdown),
+                                        )
+                                        .await
+                                        .unwrap();
+
+                                    Next(SearchAskIfOk)
+                                }
+                                None => {
+                                    context
+                                        .api
+                                        .execute(SendMessage::new(chat_id, SEARCH_COULD_NOT_FIND))
+                                        .await
+                                        .unwrap();
+
+                                    Next(SearchManually)
+                                }
+                            }
+                        }
                     }
-                    let location_result = location_result.unwrap();
-                    session.set("location", &location_result).await.unwrap();
-                    context
-                        .api
-                        .execute(
-                            SendMessage::new(
-                                chat_id,
-                                format!(
-                                    "Ist das die korrekte Straße und Hausnummer? *{}*",
-                                    location_result
-                                ),
-                            )
-                            .reply_markup(
-                                ReplyKeyboardMarkup::from(vec![
-                                    vec![KeyboardButton::new(
-                                        question_helpers::LocationQuestion::Correct.to_string(),
-                                    )],
-                                    vec![KeyboardButton::new(
-                                        question_helpers::LocationQuestion::NumberFalse.to_string(),
-                                    )],
-                                    vec![KeyboardButton::new(
-                                        question_helpers::LocationQuestion::AllFalse.to_string(),
-                                    )],
-                                ])
-                                .one_time_keyboard(true)
-                                .resize_keyboard(true),
-                            )
-                            .parse_mode(Markdown),
-                        )
-                        .await
-                        .unwrap();
-                    Next(SearchAskIfOk)
                 }
                 Text(_) => {
                     context
@@ -307,7 +337,6 @@ async fn bot_dialogue(
             Text(t) => {
                 let mut was_successful = false;
 
-                let value: Vec<Street> = session.get("street_search").await.unwrap().unwrap();
                 for street in session
                     .get::<&str, Vec<Street>>("street_search")
                     .await
@@ -342,6 +371,8 @@ async fn bot_dialogue(
         },
         SearchManuallyHouseNumber => match input.data {
             Text(t) => {
+                log::info!("Ask the user whether the house number is correct.");
+
                 context
                     .api
                     .execute(
@@ -428,55 +459,50 @@ async fn bot_dialogue(
                                 .await
                                 .unwrap();
 
-                            let location: LocationResult =
-                                session.get("location").await.unwrap().unwrap();
-                            let has_street_id = context
+                            context
                                 .request_performer
-                                .get_street_id(location.street)
+                                .add_user(
+                                    first_name,
+                                    last_name,
+                                    chat_id,
+                                    session.get("street_id").await.unwrap().unwrap(),
+                                    session.get("street_number").await.unwrap().unwrap(),
+                                )
                                 .await;
-
-                            match has_street_id {
-                                Some(street_id) => {
-                                    context
-                                        .request_performer
-                                        .add_user(
-                                            first_name,
-                                            last_name,
-                                            chat_id,
-                                            street_id,
-                                            location.house_number,
-                                        )
-                                        .await;
-                                    context
-                                        .api
-                                        .execute(SendMessage::new(chat_id, "Addresse hinzugefügt!"))
-                                        .await
-                                        .unwrap();
-
-                                    Next(Start)
-                                }
-                                None => {
-                                    context
-                                        .api
-                                        .execute(SendMessage::new(chat_id, SEARCH_COULD_NOT_FIND))
-                                        .await
-                                        .unwrap();
-
-                                    Next(SearchManually)
-                                }
-                            }
-                        }
-                        LocationQuestion::NumberFalse => {
                             context
                                 .api
-                                .execute(SendMessage::new(
-                                    chat_id,
-                                    "Bitte gib die Hausnummer an, die du verwenden willst:",
-                                ))
+                                .execute(SendMessage::new(chat_id, "Addresse hinzugefügt!"))
                                 .await
                                 .unwrap();
 
-                            Next(SearchManuallyHouseNumber)
+                            Next(Start)
+                        }
+                        LocationQuestion::NumberFalse => {
+                            let location: LocationResult =
+                                session.get("location").await.unwrap().unwrap();
+                            match context
+                                .request_performer
+                                .get_street_id(location.street)
+                                .await
+                            {
+                                Some(id) => {
+                                    context
+                                        .api
+                                        .execute(SendMessage::new(
+                                            chat_id,
+                                            "Bitte gib die Hausnummer an, die du verwenden willst:",
+                                        ))
+                                        .await
+                                        .unwrap();
+
+                                    Next(SearchManuallyHouseNumber)
+                                }
+                                None => {
+                                    context.api.execute(SendMessage::new(chat_id,
+                                    "Konnte deine Straße nicht zuordnen, versuche die Straße selbst einzugeben:")).await.unwrap();
+                                    Next(SearchManually)
+                                }
+                            }
                         }
                         LocationQuestion::AllFalse => {
                             context.api.execute(SendMessage::new(chat_id, "Bitte gib den Namen deiner Straße ein um Vorschläge anzuzeigen:")).await.unwrap();
