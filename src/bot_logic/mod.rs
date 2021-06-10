@@ -230,7 +230,7 @@ async fn bot_dialogue(
                             SendMessage::new(
                                 chat_id,
                                 format!(
-                                    "Ist das die korrekte Straße und Hausnummer? *{}*",
+                                    "Ist das die korrekte Straße und Hausnummer?\n\n*{}*",
                                     location_result
                                 ),
                             )
