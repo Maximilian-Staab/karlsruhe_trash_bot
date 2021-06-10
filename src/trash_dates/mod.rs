@@ -119,8 +119,8 @@ impl From<active_users::ActiveUsersUsers> for User {
     fn from(au: active_users::ActiveUsersUsers) -> Self {
         User {
             client_id: au.telegram_chat_id,
-            first_name: au.first_name.unwrap_or_else(|| "".to_string()),
-            last_name: au.last_name.unwrap_or_else(|| "".to_string()),
+            first_name: au.first_name.unwrap_or_default(),
+            last_name: au.last_name.unwrap_or_default(),
             dates: Vec::new(),
         }
     }
@@ -130,8 +130,8 @@ impl From<tomorrow_for_all::TomorrowForAllUsers> for User {
     fn from(au: tomorrow_for_all::TomorrowForAllUsers) -> Self {
         User {
             client_id: au.telegram_chat_id,
-            first_name: "".to_string(),
-            last_name: "".to_string(),
+            first_name: Default::default(),
+            last_name: Default::default(),
             dates: au.dates.into_iter().map(TrashDate::from).collect(),
         }
     }
