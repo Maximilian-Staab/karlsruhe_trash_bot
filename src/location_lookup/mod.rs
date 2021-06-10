@@ -42,7 +42,7 @@ impl Display for LocationResult {
         if let Some(number) = &self.house_number {
             return write!(f, " {}", number);
         }
-        return r;
+        r
     }
 }
 
@@ -78,8 +78,8 @@ impl LocationLookup {
         while let Some(lookup) = self.receiver.recv().await {
             log::info!("Got Lookup Request: {}", lookup);
 
-            let longitude = lookup.longitude.clone();
-            let latitude = lookup.latitude.clone();
+            let longitude = lookup.longitude;
+            let latitude = lookup.latitude;
             let result = tokio::task::spawn_blocking(move || {
                 Openstreetmap::new().detailed_reverse(&Point::new(longitude, latitude))
             })
@@ -88,23 +88,18 @@ impl LocationLookup {
 
             if let Err(e) = result {
                 lookup.responder.send(Err(Error::from(e))).unwrap();
+            } else if let Some(address) = result.unwrap() {
+                let result = LocationResult {
+                    city: address.city.unwrap_or_default(),
+                    country: address.country.unwrap_or_default(),
+                    house_number: address.house_number.map(|n| n.parse().unwrap()),
+                    street: address.road.unwrap_or_default(),
+                };
+                log::info!("Found location: {}", result);
+                lookup.responder.send(Ok(Some(result))).unwrap();
             } else {
-                if let Some(address) = result.unwrap() {
-                    let result = LocationResult {
-                        city: address.city.unwrap_or("".to_string()),
-                        country: address.country.unwrap_or("".to_string()),
-                        house_number: match address.house_number {
-                            None => None,
-                            Some(n) => Some(n.parse().unwrap()),
-                        },
-                        street: address.road.unwrap_or("".to_string()),
-                    };
-                    log::info!("Found location: {}", result);
-                    lookup.responder.send(Ok(Some(result))).unwrap();
-                } else {
-                    log::warn!("Didn't find anything: {}", lookup);
-                    lookup.responder.send(Ok(None)).unwrap();
-                }
+                log::warn!("Didn't find anything: {}", lookup);
+                lookup.responder.send(Ok(None)).unwrap();
             }
 
             tokio::time::sleep(Duration::from_secs(1u64)).await;
