@@ -7,6 +7,8 @@ use graphql_client::{GraphQLQuery, Response};
 use reqwest::Client;
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
+use std::panic::resume_unwind;
+use std::str::SplitWhitespace;
 
 static HASURA_HEADER: &str = "x-hasura-admin-secret";
 
@@ -106,10 +108,34 @@ pub struct Street {
     pub id: i64,
 }
 
+fn to_uppercase(string: &str) -> String {
+    let mut c = string.chars();
+    let lowercase = c.as_str().to_lowercase();
+    match c.next() {
+        None => Default::default(),
+        Some(f) => {
+            let b = f.to_uppercase().collect::<String>();
+            let k = c.as_str().to_lowercase();
+            f.to_uppercase().collect::<String>() + c.as_str().to_lowercase()
+        }
+    }
+}
+
+fn sentence_to_uppercase(s: &str) -> String {
+    let split = s.split_whitespace();
+    let mut result: Vec<String> = Vec::new();
+    for entry in split {
+        println!("Do nothing {}", entry);
+        result.push(to_uppercase(entry));
+    }
+
+    result.join(" ")
+}
+
 impl From<search_street::SearchStreetSearchStreets> for Street {
     fn from(ss: search_street::SearchStreetSearchStreets) -> Self {
         Street {
-            street: ss.name,
+            street: sentence_to_uppercase(&ss.name),
             id: ss.id,
         }
     }
