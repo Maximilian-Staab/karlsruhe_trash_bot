@@ -86,6 +86,24 @@ pub struct AddUser;
 )]
 pub struct SetNotification;
 
+#[derive(GraphQLQuery, Debug)]
+#[graphql(
+    schema_path = "graphql/schema.graphql",
+    query_path = "graphql/delete_user.graphql",
+    response_derives = "Debug",
+    normalization = "rust"
+)]
+pub struct DeleteUser;
+
+#[derive(GraphQLQuery, Debug)]
+#[graphql(
+    schema_path = "graphql/schema.graphql",
+    query_path = "graphql/notification_status.graphql",
+    response_derives = "Debug",
+    normalization = "rust"
+)]
+pub struct NotificationStatus;
+
 #[derive(Debug, Clone)]
 pub struct RequestPerformer {
     secret: String,
@@ -250,6 +268,15 @@ impl RequestPerformer {
         Some(result.search_streets.into_iter().next().unwrap().id)
     }
 
+    pub async fn get_notification_status(&self, telegram_chat_id: i64) -> Option<bool> {
+        let response_body = NotificationStatus::build_query(notification_status::Variables {
+            user_id: telegram_chat_id,
+        });
+
+        let result: notification_status::ResponseData = self.send_request(&response_body).await;
+        Some(result.users_by_pk?.enabled_notifications)
+    }
+
     pub async fn search_similar_streets(&self, street_name: String) -> Option<Vec<Street>> {
         let response_body = SearchStreet::build_query(search_street::Variables {
             limit: Some(5i64),
@@ -263,6 +290,14 @@ impl RequestPerformer {
                 .map(Street::from)
                 .collect(),
         )
+    }
+
+    pub async fn remove_user_data(&self, telegram_chat_id: i64) -> Option<bool> {
+        let response_body = DeleteUser::build_query(delete_user::Variables {
+            telegram_chat_id: Some(telegram_chat_id),
+        });
+        let result = self.send_request::<graphql_client::QueryBody<delete_user::Variables>, delete_user::ResponseData>(&response_body).await;
+        Some(result.delete_users?.affected_rows == 1)
     }
 
     pub async fn add_user(
@@ -300,14 +335,10 @@ impl RequestPerformer {
         .expect("No response Data")
     }
 
-    pub async fn set_notification(
-        &self,
-        telegram_chat_id: Option<i64>,
-        notifications: Option<bool>,
-    ) {
+    pub async fn set_notification(&self, telegram_chat_id: i64, notifications: bool) {
         let response_body = SetNotification::build_query(set_notification::Variables {
             telegram_chat_id,
-            notifications,
+            enabled_notifications: notifications,
         });
 
         self.send_request::<graphql_client::QueryBody<set_notification::Variables>, set_notification::ResponseData>(
