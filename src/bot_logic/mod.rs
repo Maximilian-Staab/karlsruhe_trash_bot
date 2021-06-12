@@ -1,5 +1,8 @@
-use crate::bot_logic::question_helpers::LocationQuestion;
-use crate::location_lookup::{LocationLookup, LocationResult, Lookup};
+use std::convert::{Infallible, TryInto};
+use std::env;
+use std::str::FromStr;
+use std::time::Duration;
+
 use anyhow::Error;
 use carapax::{
     dialogue::{
@@ -23,30 +26,28 @@ use carapax::{
     Api, Dispatcher,
 };
 use serde::{Deserialize, Serialize};
-use std::convert::{Infallible, TryInto};
-use std::env;
-use std::str::FromStr;
-use std::time::Duration;
 use tempfile::tempdir;
 use tokio::sync::mpsc;
+
 use trash_bot::trash_dates::{RequestPerformer, Street};
+
+use crate::bot_logic::question_helpers::LocationQuestion;
+use crate::location_lookup::{LocationLookup, LocationResult, Lookup};
 
 #[derive(Serialize, Deserialize)]
 enum States {
-    Start, // Done
-    MainMenu,
-    Search,                    // Done
-    SearchManually,            // Done
-    SearchManuallyKeyboard,    // Done
-    SearchManuallyHouseNumber, // Done
-    SearchManuallyHouseNumberKeyboard,
-    SearchAskIfOk,
-    Remove,
-    ToggleNotifications,
+    Start,                             // Done
+    MainMenu,                          // Done
+    Search,                            // Done
+    SearchManually,                    // Done
+    SearchManuallyKeyboard,            // Done
+    SearchManuallyHouseNumber,         // Done
+    SearchManuallyHouseNumberKeyboard, // Done
+    SearchAskIfOk,                     // Done
+    Remove,                            // Done
 }
 
 mod question_helpers {
-    use std::convert::TryFrom;
     use std::fmt::Formatter;
     use std::str::FromStr;
 
@@ -86,21 +87,26 @@ mod question_helpers {
     }
 
     pub enum MainMenuQuestion {
-        ToggleNotifications,
         Search,
+        ToggleNotifications,
+        Delete,
     }
 
     const SEARCH: &str = "Straße auswählen/ändern";
     const NOTIFICATION: &str = "Benachrichtigungen ein-/ausschalten";
+    const DELETE: &str = "Alle Daten löschen";
 
     impl std::fmt::Display for MainMenuQuestion {
         fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
             match self {
+                self::MainMenuQuestion::Search => {
+                    write!(f, "{}", SEARCH)
+                }
                 self::MainMenuQuestion::ToggleNotifications => {
                     write!(f, "{}", NOTIFICATION)
                 }
-                self::MainMenuQuestion::Search => {
-                    write!(f, "{}", SEARCH)
+                self::MainMenuQuestion::Delete => {
+                    write!(f, "{}", DELETE)
                 }
             }
         }
@@ -113,6 +119,7 @@ mod question_helpers {
             match s {
                 SEARCH => Ok(MainMenuQuestion::Search),
                 NOTIFICATION => Ok(MainMenuQuestion::ToggleNotifications),
+                DELETE => Ok(MainMenuQuestion::Delete),
                 _ => Err("Could not convert to MainMenuQuestion."),
             }
         }
@@ -128,7 +135,11 @@ mod messages {
     pub const HOUSE_NUMBER_QUESTION_1: &str = "Ist das deine Hausnummer";
     pub const HOUSE_NUMBER_QUESTION_2: &str = "Stelle sicher, dass die Nummer korrekt ist, da sonst möglicherweise keine Entsorgungstermine gefunden werden können.";
 
-    pub const SEARCH_COULD_NOT_FIND:&str = "Konnte deine Straße nicht in der Datenbank finden. Bitte gib den Namen deiner Straße ein um Vorschläge anzuzeigen:";
+    pub const SEARCH_COULD_NOT_FIND: &str = "Konnte deine Straße nicht in der Datenbank finden. Bitte gib den Namen deiner Straße ein um Vorschläge anzuzeigen:";
+
+    pub const DELETION: &str = "Willst du all deine Daten löschen?";
+    pub const NO_DELETE_MSG: &str =
+        "Konnte deine Daten nicht finden, hast du deine Daten schon gelöscht?";
 }
 
 impl State for States {
@@ -195,13 +206,17 @@ async fn bot_dialogue(
                     .reply_markup(
                         ReplyKeyboardMarkup::from(vec![
                             vec![KeyboardButton::new(
+                                question_helpers::MainMenuQuestion::Search.to_string(),
+                            )],
+                            vec![KeyboardButton::new(
                                 question_helpers::MainMenuQuestion::ToggleNotifications.to_string(),
                             )],
                             vec![KeyboardButton::new(
-                                question_helpers::MainMenuQuestion::Search.to_string(),
+                                question_helpers::MainMenuQuestion::Delete.to_string(),
                             )],
                         ])
-                        .one_time_keyboard(true),
+                        .one_time_keyboard(false)
+                        .resize_keyboard(true),
                     ),
                 )
                 .await
@@ -394,6 +409,7 @@ async fn bot_dialogue(
                     )
                     .await
                     .unwrap();
+
                 session.set("street_number", &t.data).await.unwrap();
 
                 Next(SearchManuallyHouseNumberKeyboard)
@@ -424,7 +440,7 @@ async fn bot_dialogue(
 
                     Next(Start)
                 }
-                "Nein" => {
+                _ => {
                     log::info!("User entered the house number wrong, trying again.");
                     context
                         .api
@@ -433,13 +449,6 @@ async fn bot_dialogue(
                         .unwrap();
 
                     Next(SearchManuallyHouseNumber)
-                }
-                msg => {
-                    log::info!(
-                        "Non fitting message for house-number keyboard handling received: {}",
-                        msg
-                    );
-                    Next(Start)
                 }
             },
             _ => Next(Start),
@@ -454,7 +463,7 @@ async fn bot_dialogue(
                                 .api
                                 .execute(SendMessage::new(
                                     chat_id,
-                                    "Speichere deinen Standort für die Abfrage der Müllabholdaten.",
+                                    "Speichere deinen Standort für die Abfrage der Entsorgungstermine.",
                                 ))
                                 .await
                                 .unwrap();
@@ -469,6 +478,7 @@ async fn bot_dialogue(
                                     session.get("street_number").await.unwrap().unwrap(),
                                 )
                                 .await;
+
                             context
                                 .api
                                 .execute(SendMessage::new(chat_id, "Addresse hinzugefügt!"))
@@ -478,34 +488,18 @@ async fn bot_dialogue(
                             Next(Start)
                         }
                         LocationQuestion::NumberFalse => {
-                            let location: LocationResult =
-                                session.get("location").await.unwrap().unwrap();
-                            match context
-                                .request_performer
-                                .get_street_id(location.street)
+                            context
+                                .api
+                                .execute(SendMessage::new(
+                                    chat_id,
+                                    "Bitte gib die Hausnummer an, die du verwenden willst:",
+                                ))
                                 .await
-                            {
-                                Some(id) => {
-                                    context
-                                        .api
-                                        .execute(SendMessage::new(
-                                            chat_id,
-                                            "Bitte gib die Hausnummer an, die du verwenden willst:",
-                                        ))
-                                        .await
-                                        .unwrap();
-
-                                    Next(SearchManuallyHouseNumber)
-                                }
-                                None => {
-                                    context.api.execute(SendMessage::new(chat_id,
-                                    "Konnte deine Straße nicht zuordnen, versuche die Straße selbst einzugeben:")).await.unwrap();
-                                    Next(SearchManually)
-                                }
-                            }
+                                .unwrap();
+                            Next(SearchManuallyHouseNumber)
                         }
                         LocationQuestion::AllFalse => {
-                            context.api.execute(SendMessage::new(chat_id, "Bitte gib den Namen deiner Straße ein um Vorschläge anzuzeigen:")).await.unwrap();
+                            context.api.execute(SendMessage::new(chat_id, "Bitte gib den Namen deiner Straße ein, um Vorschläge anzuzeigen:")).await.unwrap();
 
                             Next(SearchManually)
                         }
@@ -514,8 +508,37 @@ async fn bot_dialogue(
                 _ => Next(Start),
             }
         }
-        Remove => Next(Start),
-        ToggleNotifications => Next(Start),
+        Remove => match input.data {
+            Text(t) => match &t.data[..] {
+                "Ja" => {
+                    let worked = context.request_performer.remove_user_data(chat_id).await;
+
+                    match worked.unwrap_or(false) {
+                        true => context
+                            .api
+                            .execute(SendMessage::new(chat_id, "Gelöscht!"))
+                            .await
+                            .unwrap(),
+                        false => context
+                            .api
+                            .execute(SendMessage::new(chat_id, NO_DELETE_MSG))
+                            .await
+                            .unwrap(),
+                    };
+
+                    Next(Start)
+                }
+                _ => {
+                    context
+                        .api
+                        .execute(SendMessage::new(chat_id, "Ok, nichts passiert!"))
+                        .await
+                        .unwrap();
+                    Next(Start)
+                }
+            },
+            _ => Next(Start),
+        },
         MainMenu => match input.data {
             Text(t) => match question_helpers::MainMenuQuestion::from_str(&t.data) {
                 Ok(main_menu_question) => match main_menu_question {
@@ -528,17 +551,71 @@ async fn bot_dialogue(
                         ];
 
                         let markup = ReplyKeyboardMarkup::from(row)
-                            .one_time_keyboard(false)
-                            .resize_keyboard(false);
-                        let reply_markup = ReplyMarkup::from(markup);
+                            .one_time_keyboard(true)
+                            .resize_keyboard(true);
 
-                        context.api.execute(SendMessage::new(chat_id, "Willst du deine Addresse selbst eingeben oder willst du sie automatisch finden lassen?").reply_markup(reply_markup)).await.unwrap();
+                        context.api.execute(SendMessage::new(chat_id, "Willst du deine Addresse selbst eingeben oder willst du sie automatisch finden lassen?")
+                            .reply_markup(markup)).await.unwrap();
 
                         Next(Search)
                     }
                     question_helpers::MainMenuQuestion::ToggleNotifications => {
                         log::info!("Benachrichtigungen");
-                        Next(ToggleNotifications)
+
+                        match context
+                            .request_performer
+                            .get_notification_status(chat_id)
+                            .await
+                        {
+                            Some(t) => {
+                                context
+                                    .request_performer
+                                    .set_notification(chat_id, !t)
+                                    .await;
+
+                                match !t {
+                                    true => context
+                                        .api
+                                        .execute(SendMessage::new(
+                                            chat_id,
+                                            "Benachrichtigungen aktiviert",
+                                        ))
+                                        .await
+                                        .unwrap(),
+                                    false => context
+                                        .api
+                                        .execute(SendMessage::new(
+                                            chat_id,
+                                            "Benachrichtigungen deaktiviert",
+                                        ))
+                                        .await
+                                        .unwrap(),
+                                };
+                                Next(MainMenu)
+                            }
+                            None => {
+                                context.api.execute(SendMessage::new(chat_id, "Konnte Benachrichtigungsstatus nicht finden, hast du deine Strasse und Hausnummer schon hinzugefügt?")).await.unwrap();
+                                Next(MainMenu)
+                            }
+                        }
+                    }
+                    question_helpers::MainMenuQuestion::Delete => {
+                        log::info!("User data deletion: main menu");
+
+                        let row = vec![
+                            vec![KeyboardButton::new("Ja")],
+                            vec![KeyboardButton::new("Nein")],
+                        ];
+                        let markup = ReplyKeyboardMarkup::from(row)
+                            .one_time_keyboard(true)
+                            .resize_keyboard(true);
+                        context
+                            .api
+                            .execute(SendMessage::new(chat_id, DELETION).reply_markup(markup))
+                            .await
+                            .unwrap();
+
+                        Next(Remove)
                     }
                 },
                 Err(e) => {
@@ -574,7 +651,7 @@ impl Bot {
             request_performer: RequestPerformer::from_env(),
         });
 
-        let (capacity, interval) = (nonzero!(1u32), Duration::from_secs(5));
+        let (capacity, interval) = (nonzero!(3u32), Duration::from_secs(3));
 
         dispatcher.add_handler(KeyedRateLimitHandler::new(
             limit_all_chats,
