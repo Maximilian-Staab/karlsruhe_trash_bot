@@ -1,5 +1,5 @@
-mutation SetNotification($telegram_chat_id: Int, $notifications: Boolean) {
-    update_users(where: {telegram_chat_id: {_eq: $telegram_chat_id}}, _set: {enabled_notifications: $notifications}) {
-        affected_rows
+mutation SetNotification($telegram_chat_id: Int!, $enabled_notifications: Boolean!) {
+    update_users_by_pk(pk_columns: {telegram_chat_id: $telegram_chat_id}, _set: {enabled_notifications: $enabled_notifications}) {
+        enabled_notifications
     }
 }

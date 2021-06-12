@@ -1,0 +1,5 @@
+mutation DeleteUser($telegram_chat_id: Int) {
+    delete_users(where: {telegram_chat_id: {_eq: $telegram_chat_id}}) {
+        affected_rows
+    }
+}

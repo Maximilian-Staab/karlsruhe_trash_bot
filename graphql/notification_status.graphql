@@ -1,0 +1,5 @@
+query NotificationStatus($user_id: Int!) {
+    users_by_pk(telegram_chat_id: $user_id) {
+        enabled_notifications
+    }
+}
