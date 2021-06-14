@@ -1,3 +1,5 @@
+[![Publish Docker image](https://github.com/Maximilian-Staab/karlsruhe_trash_bot/actions/workflows/main.yml/badge.svg?branch=main)](https://github.com/Maximilian-Staab/karlsruhe_trash_bot/actions/workflows/main.yml)
+
 # Entsorgungskalender Chatbot - Karlsruhe 
 
 **Dieser Chatbot hat nichts mit irgendeiner offiziellen Stelle der Stadt Karlsruhe zu tun. Dies ist ein Hobbyprojekt,
