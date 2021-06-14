@@ -480,7 +480,7 @@ type mutation_root {
   """
   delete single row from the table: "users"
   """
-  delete_users_by_pk(id: Int!): users
+  delete_users_by_pk(telegram_chat_id: Int!): users
 
   """
   insert data into the table: "dates"
@@ -909,7 +909,7 @@ type query_root {
   ): users_aggregate!
 
   """fetch data from the table: "users" using primary key columns"""
-  users_by_pk(id: Int!): users
+  users_by_pk(telegram_chat_id: Int!): users
 }
 
 input search_streets_args {
@@ -1462,7 +1462,7 @@ type subscription_root {
   ): users_aggregate!
 
   """fetch data from the table: "users" using primary key columns"""
-  users_by_pk(id: Int!): users
+  users_by_pk(telegram_chat_id: Int!): users
 }
 
 scalar timestamptz
@@ -1773,10 +1773,7 @@ type users {
     where: dates_bool_exp
   ): dates_aggregate!
   enabled_notifications: Boolean!
-  first_name: String
   house_number: String
-  id: Int!
-  last_name: String
   street: Int!
 
   """An object relationship"""
@@ -1838,7 +1835,6 @@ input users_arr_rel_insert_input {
 
 """aggregate avg on columns"""
 type users_avg_fields {
-  id: Float
   street: Float
   telegram_chat_id: Float
 }
@@ -1847,7 +1843,6 @@ type users_avg_fields {
 order by avg() on columns of table "users"
 """
 input users_avg_order_by {
-  id: order_by
   street: order_by
   telegram_chat_id: order_by
 }
@@ -1862,10 +1857,7 @@ input users_bool_exp {
   created_at: timestamptz_comparison_exp
   dates: dates_bool_exp
   enabled_notifications: Boolean_comparison_exp
-  first_name: String_comparison_exp
   house_number: String_comparison_exp
-  id: Int_comparison_exp
-  last_name: String_comparison_exp
   street: Int_comparison_exp
   streetByStreet: streets_bool_exp
   telegram_chat_id: Int_comparison_exp
@@ -1876,17 +1868,16 @@ unique or primary key constraints on table "users"
 """
 enum users_constraint {
   """unique or primary key constraint"""
-  Users_pkey
+  Users_telegram_chat_id_key
 
   """unique or primary key constraint"""
-  Users_telegram_chat_id_key
+  users_pkey
 }
 
 """
 input type for incrementing numeric columns in table "users"
 """
 input users_inc_input {
-  id: Int
   street: Int
   telegram_chat_id: Int
 }
@@ -1898,10 +1889,7 @@ input users_insert_input {
   created_at: timestamptz
   dates: dates_arr_rel_insert_input
   enabled_notifications: Boolean
-  first_name: String
   house_number: String
-  id: Int
-  last_name: String
   street: Int
   streetByStreet: streets_obj_rel_insert_input
   telegram_chat_id: Int
@@ -1910,10 +1898,7 @@ input users_insert_input {
 """aggregate max on columns"""
 type users_max_fields {
   created_at: timestamptz
-  first_name: String
   house_number: String
-  id: Int
-  last_name: String
   street: Int
   telegram_chat_id: Int
 }
@@ -1923,10 +1908,7 @@ order by max() on columns of table "users"
 """
 input users_max_order_by {
   created_at: order_by
-  first_name: order_by
   house_number: order_by
-  id: order_by
-  last_name: order_by
   street: order_by
   telegram_chat_id: order_by
 }
@@ -1934,10 +1916,7 @@ input users_max_order_by {
 """aggregate min on columns"""
 type users_min_fields {
   created_at: timestamptz
-  first_name: String
   house_number: String
-  id: Int
-  last_name: String
   street: Int
   telegram_chat_id: Int
 }
@@ -1947,10 +1926,7 @@ order by min() on columns of table "users"
 """
 input users_min_order_by {
   created_at: order_by
-  first_name: order_by
   house_number: order_by
-  id: order_by
-  last_name: order_by
   street: order_by
   telegram_chat_id: order_by
 }
@@ -1990,10 +1966,7 @@ input users_order_by {
   created_at: order_by
   dates_aggregate: dates_aggregate_order_by
   enabled_notifications: order_by
-  first_name: order_by
   house_number: order_by
-  id: order_by
-  last_name: order_by
   street: order_by
   streetByStreet: streets_order_by
   telegram_chat_id: order_by
@@ -2001,7 +1974,7 @@ input users_order_by {
 
 """primary key columns input for table: users"""
 input users_pk_columns_input {
-  id: Int!
+  telegram_chat_id: Int!
 }
 
 """
@@ -2015,16 +1988,7 @@ enum users_select_column {
   enabled_notifications
 
   """column name"""
-  first_name
-
-  """column name"""
   house_number
-
-  """column name"""
-  id
-
-  """column name"""
-  last_name
 
   """column name"""
   street
@@ -2039,17 +2003,13 @@ input type for updating data in table "users"
 input users_set_input {
   created_at: timestamptz
   enabled_notifications: Boolean
-  first_name: String
   house_number: String
-  id: Int
-  last_name: String
   street: Int
   telegram_chat_id: Int
 }
 
 """aggregate stddev on columns"""
 type users_stddev_fields {
-  id: Float
   street: Float
   telegram_chat_id: Float
 }
@@ -2058,14 +2018,12 @@ type users_stddev_fields {
 order by stddev() on columns of table "users"
 """
 input users_stddev_order_by {
-  id: order_by
   street: order_by
   telegram_chat_id: order_by
 }
 
 """aggregate stddev_pop on columns"""
 type users_stddev_pop_fields {
-  id: Float
   street: Float
   telegram_chat_id: Float
 }
@@ -2074,14 +2032,12 @@ type users_stddev_pop_fields {
 order by stddev_pop() on columns of table "users"
 """
 input users_stddev_pop_order_by {
-  id: order_by
   street: order_by
   telegram_chat_id: order_by
 }
 
 """aggregate stddev_samp on columns"""
 type users_stddev_samp_fields {
-  id: Float
   street: Float
   telegram_chat_id: Float
 }
@@ -2090,14 +2046,12 @@ type users_stddev_samp_fields {
 order by stddev_samp() on columns of table "users"
 """
 input users_stddev_samp_order_by {
-  id: order_by
   street: order_by
   telegram_chat_id: order_by
 }
 
 """aggregate sum on columns"""
 type users_sum_fields {
-  id: Int
   street: Int
   telegram_chat_id: Int
 }
@@ -2106,7 +2060,6 @@ type users_sum_fields {
 order by sum() on columns of table "users"
 """
 input users_sum_order_by {
-  id: order_by
   street: order_by
   telegram_chat_id: order_by
 }
@@ -2122,16 +2075,7 @@ enum users_update_column {
   enabled_notifications
 
   """column name"""
-  first_name
-
-  """column name"""
   house_number
-
-  """column name"""
-  id
-
-  """column name"""
-  last_name
 
   """column name"""
   street
@@ -2142,7 +2086,6 @@ enum users_update_column {
 
 """aggregate var_pop on columns"""
 type users_var_pop_fields {
-  id: Float
   street: Float
   telegram_chat_id: Float
 }
@@ -2151,14 +2094,12 @@ type users_var_pop_fields {
 order by var_pop() on columns of table "users"
 """
 input users_var_pop_order_by {
-  id: order_by
   street: order_by
   telegram_chat_id: order_by
 }
 
 """aggregate var_samp on columns"""
 type users_var_samp_fields {
-  id: Float
   street: Float
   telegram_chat_id: Float
 }
@@ -2167,14 +2108,12 @@ type users_var_samp_fields {
 order by var_samp() on columns of table "users"
 """
 input users_var_samp_order_by {
-  id: order_by
   street: order_by
   telegram_chat_id: order_by
 }
 
 """aggregate variance on columns"""
 type users_variance_fields {
-  id: Float
   street: Float
   telegram_chat_id: Float
 }
@@ -2183,7 +2122,6 @@ type users_variance_fields {
 order by variance() on columns of table "users"
 """
 input users_variance_order_by {
-  id: order_by
   street: order_by
   telegram_chat_id: order_by
 }
