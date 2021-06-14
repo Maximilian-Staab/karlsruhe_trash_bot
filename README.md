@@ -1,7 +1,20 @@
 # Telegram-Bot: Karlsruhe Entsorgungstermine
 
-**Dieser Chatbot hat nichts mit irgendeiner offiziellen Stelle der Stadt Karlsruhe zu tun. Dies ist ein Hobbyprojekt welches ich fuer mich selbst geschrieben habe.**
+**Dieser Chatbot hat nichts mit irgendeiner offiziellen Stelle der Stadt Karlsruhe zu tun. Dies ist ein Hobbyprojekt,
+welches ich fur mich selbst geschrieben habe.**
 
-Mit diesem Telegram-Bot kann man sich die Entsorgungstermine in Karlsruhe am zuschicken lassen.
-Dazu speichert man eine Strasse und Hausnummer, zu der man Nachrichten bekommen moechte.
-Anschliessend wird einem um 16 Uhr eine Nachricht geschickt, wenn am naechten Tag eine Art von Muell abgeholt wird.
+Mit diesem Telegram-Bot kann man sich die Entsorgungstermine in Karlsruhe zuschicken lassen. Dazu speichert man eine
+Strassen und Hausnummer, zu der man Nachrichten bekommen mochte. Anschließend wird einem um 16 Uhr eine Nachricht
+geschickt, wenn am na echten Tag Bio/Papier/Restmüll abgeholt wird.
+
+# Environment Variables
+
+A graphql api is used for interacting with the database. These are the required environment variables used to connect
+and authenticate with it:
+
+| Key                | Default | Description                                  |
+| ------------------ | :-----: | -------------------------------------------- |
+| TELEGRAM_BOT_TOKEN |         | Token for your telegram bot                  |
+| HASURA_ENDPOINT    |         | Graphql endpoint url                         |
+| HASURA_SECRET      |         | Graphql endpoint secret                      |
+| RUST_LOG           |         | (Optional) Set log level for the application |
