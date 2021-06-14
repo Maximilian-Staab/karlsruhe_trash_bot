@@ -1,12 +1,13 @@
 use std::env;
-use std::fmt::Formatter;
+use std::fmt::{Debug, Formatter};
 
-use anyhow::Error;
+use anyhow::{Error, Result};
 use chrono::{NaiveDate, Utc};
 use graphql_client::{GraphQLQuery, Response};
 use reqwest::Client;
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 static HASURA_HEADER: &str = "x-hasura-admin-secret";
 
@@ -26,8 +27,6 @@ pub enum TrashType {
 
 #[derive(Eq, PartialEq, Debug, Clone)]
 pub struct User {
-    first_name: String,
-    last_name: String,
     pub client_id: i64,
     pub dates: Vec<TrashDate>,
 }
@@ -40,6 +39,35 @@ pub struct User {
     normalization = "rust"
 )]
 pub struct TomorrowForUser;
+
+#[derive(GraphQLQuery, Debug)]
+#[graphql(
+    schema_path = "graphql/schema.graphql",
+    query_path = "graphql/all_user_data.graphql",
+    response_derives = "Debug",
+    normalization = "rust"
+)]
+pub struct UserData;
+
+impl From<user_data::UserDataUsersByPk> for HashMap<String, String> {
+    fn from(aud: user_data::UserDataUsersByPk) -> Self {
+        let mut map: HashMap<String, String> = HashMap::new();
+        map.insert("created_at".to_string(), aud.created_at.to_string());
+        map.insert(
+            "enabled_notifications".to_string(),
+            aud.enabled_notifications.to_string(),
+        );
+        map.insert(
+            "house_number".to_string(),
+            aud.house_number.unwrap_or_default(),
+        );
+        map.insert("street".to_string(), aud.street.to_string());
+        map.insert("chat_id".to_string(), aud.telegram_chat_id.to_string());
+        map.insert("street".to_string(), aud.street_by_street.name);
+
+        map
+    }
+}
 
 #[derive(GraphQLQuery, Debug)]
 #[graphql(
@@ -152,8 +180,6 @@ impl From<active_users::ActiveUsersUsers> for User {
     fn from(au: active_users::ActiveUsersUsers) -> Self {
         User {
             client_id: au.telegram_chat_id,
-            first_name: au.first_name.unwrap_or_default(),
-            last_name: au.last_name.unwrap_or_default(),
             dates: Vec::new(),
         }
     }
@@ -163,8 +189,6 @@ impl From<tomorrow_for_all::TomorrowForAllUsers> for User {
     fn from(au: tomorrow_for_all::TomorrowForAllUsers) -> Self {
         User {
             client_id: au.telegram_chat_id,
-            first_name: Default::default(),
-            last_name: Default::default(),
             dates: au.dates.into_iter().map(TrashDate::from).collect(),
         }
     }
@@ -210,11 +234,7 @@ impl std::fmt::Display for TrashDate {
 
 impl std::fmt::Display for User {
     fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
-        write!(
-            f,
-            "{} {}: {:?}",
-            self.first_name, self.last_name, self.client_id
-        )
+        write!(f, "{:?}", self.client_id)
     }
 }
 
@@ -237,10 +257,10 @@ impl RequestPerformer {
     }
 
     #[allow(dead_code)]
-    pub async fn get_tomorrows_trash(&self, user_id: i64) -> Result<Vec<TrashDate>, Error> {
-        // let variables: trash_at_date::Variables();
+    pub async fn get_tomorrows_trash(&self, user_id: i64) -> Result<Vec<TrashDate>> {
         let request_body = TomorrowForUser::build_query(tomorrow_for_user::Variables { user_id });
-        let response_data: tomorrow_for_user::ResponseData = self.send_request(&request_body).await;
+        let response_data: tomorrow_for_user::ResponseData =
+            self.send_request(&request_body).await?;
 
         Ok(response_data
             .dates
@@ -249,78 +269,103 @@ impl RequestPerformer {
             .collect())
     }
 
-    fn log_errors<T>(&self, response: Response<T>) -> Option<T> {
+    fn log_errors<T>(&self, response: Response<T>) -> Result<T> {
         if let Some(errors) = &response.errors {
             log::error!("Something failed!");
 
             for error in errors {
                 log::error!("{:?}", error);
             }
+
+            Err(Error::msg(
+                "at least one error occurred while querying graphql",
+            ))
+        } else {
+            response
+                .data
+                .ok_or(Error::msg("could not extract data from graphql query"))
         }
-        response.data
     }
 
-    pub async fn get_street_id(&self, street_name: String) -> Option<i64> {
+    pub async fn get_street_id(&self, street_name: String) -> Result<i64> {
         let response_body = SearchStreet::build_query(search_street::Variables {
             limit: Some(1i64),
             name: Some(street_name),
         });
-        let result: search_street::ResponseData = self.send_request(&response_body).await;
-        Some(result.search_streets.into_iter().next().unwrap().id)
+        let result: search_street::ResponseData = self.send_request(&response_body).await?;
+        Ok(result.search_streets.into_iter().next().unwrap().id)
     }
 
-    pub async fn get_notification_status(&self, telegram_chat_id: i64) -> Option<bool> {
+    pub async fn get_notification_status(&self, telegram_chat_id: i64) -> Result<bool> {
         let response_body = NotificationStatus::build_query(notification_status::Variables {
             user_id: telegram_chat_id,
         });
 
-        let result: notification_status::ResponseData = self.send_request(&response_body).await;
-        Some(result.users_by_pk?.enabled_notifications)
+        let result: notification_status::ResponseData = self.send_request(&response_body).await?;
+        Ok(result
+            .users_by_pk
+            .ok_or(Error::msg("user not found"))?
+            .enabled_notifications)
     }
 
-    pub async fn search_similar_streets(&self, street_name: String) -> Option<Vec<Street>> {
+    pub async fn get_my_user_data(&self, telegram_chat_id: i64) -> Result<HashMap<String, String>> {
+        let response_body = UserData::build_query(user_data::Variables { telegram_chat_id });
+
+        let result = self
+            .send_request::<graphql_client::QueryBody<user_data::Variables>, user_data::ResponseData>(&response_body)
+            .await?
+            .users_by_pk
+            .ok_or_else(|| Error::msg("could not find user"))?;
+        Ok(HashMap::from(result))
+    }
+
+    pub async fn search_similar_streets(&self, street_name: String) -> Result<Vec<Street>> {
         let response_body = SearchStreet::build_query(search_street::Variables {
             limit: Some(5i64),
             name: Some(street_name),
         });
-        let result: search_street::ResponseData = self.send_request(&response_body).await;
-        Some(
-            result
-                .search_streets
-                .into_iter()
-                .map(Street::from)
-                .collect(),
-        )
+        let result: search_street::ResponseData = self.send_request(&response_body).await?;
+        Ok(result
+            .search_streets
+            .into_iter()
+            .map(Street::from)
+            .collect())
     }
 
-    pub async fn remove_user_data(&self, telegram_chat_id: i64) -> Option<bool> {
+    pub async fn remove_user_data(&self, telegram_chat_id: i64) -> Result<bool> {
         let response_body = DeleteUser::build_query(delete_user::Variables {
             telegram_chat_id: Some(telegram_chat_id),
         });
-        let result = self.send_request::<graphql_client::QueryBody<delete_user::Variables>, delete_user::ResponseData>(&response_body).await;
-        Some(result.delete_users?.affected_rows == 1)
+        let result: delete_user::ResponseData = self.send_request(&response_body).await?;
+        Ok(result
+            .delete_users
+            .ok_or(Error::msg("user not found"))?
+            .affected_rows
+            == 1)
     }
 
     pub async fn add_user(
         &self,
-        first_name: Option<String>,
-        last_name: Option<String>,
         telegram_chat_id: i64,
         street: Option<i64>,
         house_number: Option<String>,
-    ) {
+    ) -> Result<add_user::ResponseData> {
         let response_body = AddUser::build_query(add_user::Variables {
-            last_name,
-            first_name,
             telegram_chat_id,
             street,
             house_number,
         });
 
-        self.send_request::<graphql_client::QueryBody<add_user::Variables>, add_user::ResponseData>(&response_body).await;
+        self.send_request::<graphql_client::QueryBody<add_user::Variables>, add_user::ResponseData>(
+            &response_body,
+        )
+        .await
     }
 
-    async fn send_request<T: Serialize + ?Sized, R: DeserializeOwned>(&self, json: &T) -> R {
+    async fn send_request<T: Serialize + ?Sized, R: DeserializeOwned>(
+        &self,
+        json: &T,
+    ) -> Result<R> {
         self.log_errors(
             self.client
                 .post(&self.endpoint)
@@ -333,10 +378,13 @@ impl RequestPerformer {
                 .await
                 .unwrap(),
         )
-        .expect("No response Data")
     }
 
-    pub async fn set_notification(&self, telegram_chat_id: i64, notifications: bool) {
+    pub async fn set_notification(
+        &self,
+        telegram_chat_id: i64,
+        notifications: bool,
+    ) -> Result<bool> {
         let response_body = SetNotification::build_query(set_notification::Variables {
             telegram_chat_id,
             enabled_notifications: notifications,
@@ -344,21 +392,22 @@ impl RequestPerformer {
 
         self.send_request::<graphql_client::QueryBody<set_notification::Variables>, set_notification::ResponseData>(
             &response_body,
-        ).await;
+        ).await?;
+        Ok(notifications)
     }
 
     #[allow(dead_code)]
-    pub async fn get_active_users(&self) -> Result<Vec<User>, Error> {
+    pub async fn get_active_users(&self) -> Result<Vec<User>> {
         let response_body = ActiveUsers::build_query(active_users::Variables {});
-        let response_data: active_users::ResponseData = self.send_request(&response_body).await;
+        let response_data: active_users::ResponseData = self.send_request(&response_body).await?;
 
         Ok(response_data.users.into_iter().map(User::from).collect())
     }
 
-    pub async fn get_active_users_tomorrow(&self) -> Result<Vec<User>, Error> {
-        // let variables: trash_at_date::Variables();
+    pub async fn get_active_users_tomorrow(&self) -> Result<Vec<User>> {
         let request_body = TomorrowForAll::build_query(tomorrow_for_all::Variables {});
-        let response_data: tomorrow_for_all::ResponseData = self.send_request(&request_body).await;
+        let response_data: tomorrow_for_all::ResponseData =
+            self.send_request(&request_body).await?;
 
         Ok(response_data.users.into_iter().map(User::from).collect())
     }

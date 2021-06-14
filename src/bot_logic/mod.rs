@@ -51,7 +51,7 @@ impl State for States {
     }
 }
 
-pub struct Bot {}
+pub struct Bot;
 
 struct Context {
     api: Api,
@@ -78,6 +78,61 @@ async fn get_reverse_location(
     Ok(location_result_answer.await??.unwrap())
 }
 
+async fn add_user(
+    request_performer: &RequestPerformer,
+    api: &Api,
+    telegram_chat_id: i64,
+    street: Option<i64>,
+    house_number: Option<String>,
+) {
+    use crate::bot_logic::strings::*;
+
+    log::info!("User entered the house correctly, updating user profile.");
+
+    api.execute(SendMessage::new(telegram_chat_id, MESSAGE_SAVE_LOCATION))
+        .await
+        .unwrap();
+
+    match request_performer
+        .add_user(telegram_chat_id, street, house_number)
+        .await
+    {
+        Ok(_) => api
+            .execute(SendMessage::new(
+                telegram_chat_id,
+                MESSAGE_CONFIRM_ADDRESS_ADDED,
+            ))
+            .await
+            .unwrap(),
+        Err(_) => api
+            .execute(SendMessage::new(
+                telegram_chat_id,
+                MESSAGE_ERROR_ADDRESS_ADDED,
+            ))
+            .await
+            .unwrap(),
+    };
+}
+
+async fn send_affirmative_or_negative(
+    api: &Api,
+    telegram_chat_id: i64,
+    switch: bool,
+    positive_message: &str,
+    negative_message: &str,
+) {
+    match switch {
+        true => api
+            .execute(SendMessage::new(telegram_chat_id, positive_message))
+            .await
+            .unwrap(),
+        false => api
+            .execute(SendMessage::new(telegram_chat_id, negative_message))
+            .await
+            .unwrap(),
+    };
+}
+
 #[dialogue]
 async fn bot_dialogue(
     state: States,
@@ -90,8 +145,7 @@ async fn bot_dialogue(
 
     let chat_id = input.get_chat_id();
     let user = input.get_user().unwrap();
-    let first_name = Some(user.first_name.clone());
-    let last_name = user.last_name.clone();
+    let first_name = user.first_name.clone();
     let mut session = context.session_manager.get_session(&input).unwrap();
 
     #[allow(clippy::eval_order_dependence)]
@@ -105,8 +159,8 @@ async fn bot_dialogue(
                         format!(
                             "{}{}{}!\n{}",
                             HELLO,
-                            if first_name.is_some() { " " } else { "" },
-                            first_name.as_deref().unwrap_or(""),
+                            if !first_name.is_empty() { " " } else { "" },
+                            first_name,
                             MESSAGE_ASK_WHAT_USER_WANTS
                         ),
                     )
@@ -153,7 +207,7 @@ async fn bot_dialogue(
                                 .get_street_id(location_result.street.clone())
                                 .await
                             {
-                                Some(street_id) => {
+                                Ok(street_id) => {
                                     session.set("street_id", &street_id).await.unwrap();
                                     session
                                         .set("street_number", &location_result.house_number)
@@ -192,7 +246,9 @@ async fn bot_dialogue(
 
                                     Next(SearchAskIfOk)
                                 }
-                                None => {
+                                Err(e) => {
+                                    log::error!("{}", e);
+
                                     context
                                         .api
                                         .execute(SendMessage::new(
@@ -324,24 +380,14 @@ async fn bot_dialogue(
         SearchManuallyHouseNumberKeyboard => match input.data {
             Text(t) => match &t.data[..] {
                 YES => {
-                    log::info!("User entered the house correctly, updating user profile.");
-
-                    context
-                        .request_performer
-                        .add_user(
-                            first_name,
-                            last_name,
-                            chat_id,
-                            session.get("street_id").await.unwrap(),
-                            session.get("street_number").await.unwrap(),
-                        )
-                        .await;
-
-                    context
-                        .api
-                        .execute(SendMessage::new(chat_id, MESSAGE_CONFIRM_ADDRESS_ADDED))
-                        .await
-                        .unwrap();
+                    add_user(
+                        &context.request_performer,
+                        &context.api,
+                        chat_id,
+                        session.get("street_id").await.unwrap(),
+                        session.get("street_number").await.unwrap(),
+                    )
+                    .await;
 
                     Exit
                 }
@@ -365,29 +411,14 @@ async fn bot_dialogue(
 
                 match LocationQuestion::from_str(&t.data).unwrap() {
                     LocationQuestion::Correct => {
-                        context
-                            .api
-                            .execute(SendMessage::new(chat_id, MESSAGE_SAVE_LOCATION))
-                            .await
-                            .unwrap();
-
-                        context
-                            .request_performer
-                            .add_user(
-                                first_name,
-                                last_name,
-                                chat_id,
-                                session.get("street_id").await.unwrap().unwrap(),
-                                session.get("street_number").await.unwrap().unwrap(),
-                            )
-                            .await;
-
-                        context
-                            .api
-                            .execute(SendMessage::new(chat_id, MESSAGE_CONFIRM_ADDRESS_ADDED))
-                            .await
-                            .unwrap();
-
+                        add_user(
+                            &context.request_performer,
+                            &context.api,
+                            chat_id,
+                            session.get("street_id").await.unwrap(),
+                            session.get("street_number").await.unwrap(),
+                        )
+                        .await;
                         Exit
                     }
                     LocationQuestion::NumberFalse => {
@@ -404,7 +435,6 @@ async fn bot_dialogue(
                             .execute(SendMessage::new(chat_id, MESSAGE_ENTER_STREET_NAME))
                             .await
                             .unwrap();
-
                         Next(SearchManually)
                     }
                 }
@@ -416,19 +446,14 @@ async fn bot_dialogue(
                 YES => {
                     let worked = context.request_performer.remove_user_data(chat_id).await;
 
-                    match worked.unwrap_or(false) {
-                        true => context
-                            .api
-                            .execute(SendMessage::new(chat_id, MESSAGE_DELETED))
-                            .await
-                            .unwrap(),
-                        false => context
-                            .api
-                            .execute(SendMessage::new(chat_id, NO_DELETE_MSG))
-                            .await
-                            .unwrap(),
-                    };
-
+                    send_affirmative_or_negative(
+                        &context.api,
+                        chat_id,
+                        worked.unwrap_or(false),
+                        MESSAGE_DELETED,
+                        NO_DELETE_MSG,
+                    )
+                    .await;
                     Exit
                 }
                 _ => {
@@ -476,33 +501,42 @@ async fn bot_dialogue(
                             .get_notification_status(chat_id)
                             .await
                         {
-                            Some(t) => {
-                                context
+                            Ok(t) => {
+                                match context
                                     .request_performer
                                     .set_notification(chat_id, !t)
-                                    .await;
-
-                                match !t {
-                                    true => context
-                                        .api
-                                        .execute(SendMessage::new(
+                                    .await
+                                {
+                                    Ok(new_state) => {
+                                        send_affirmative_or_negative(
+                                            &context.api,
                                             chat_id,
+                                            new_state,
                                             MESSAGE_NOTIFICATIONS_ACTIVATED,
-                                        ))
-                                        .await
-                                        .unwrap(),
-                                    false => context
-                                        .api
-                                        .execute(SendMessage::new(
-                                            chat_id,
                                             MESSAGE_NOTIFICATIONS_DEACTIVATED,
-                                        ))
-                                        .await
-                                        .unwrap(),
+                                        )
+                                        .await;
+                                    }
+                                    Err(e) => {
+                                        log::error!(
+                                            "error while changing notification status: {}",
+                                            e
+                                        );
+                                        context
+                                            .api
+                                            .execute(SendMessage::new(
+                                                chat_id,
+                                                MESSAGE_ERROR_CHANGE_NOTIFICATION,
+                                            ))
+                                            .await
+                                            .unwrap();
+                                    }
                                 };
                                 Next(MainMenu)
                             }
-                            None => {
+                            Err(e) => {
+                                log::error!("{}", e);
+
                                 context
                                     .api
                                     .execute(SendMessage::new(
