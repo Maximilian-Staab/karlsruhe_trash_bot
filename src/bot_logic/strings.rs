@@ -17,6 +17,8 @@ pub const MESSAGE_ERROR_ADDRESS_ADDED: &str =
 pub const MESSAGE_CHANGE_NOTIFICATION_NEGATIVE: &str = "Konnte Benachrichtigungsstatus nicht finden, hast du deine Straße und Hausnummer schon hinzugefügt?";
 pub const MESSAGE_ERROR_CHANGE_NOTIFICATION: &str =
     "Konnte Benachrichtigungsstatus nicht ändern, versuche es später nochmal!";
+pub const MESSAGE_ERROR_REQUEST_USER_DATA: &str =
+    "Konnte keine Daten finden, hast du deine Straße schon hinzugefügt?";
 pub const MESSAGE_ENTER_HOUSE_NUMBER: &str =
     "Bitte gib die Hausnummer an, die du verwenden willst:";
 pub const MESSAGE_ENTER_STREET_NAME: &str =
