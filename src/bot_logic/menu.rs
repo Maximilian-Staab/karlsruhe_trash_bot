@@ -40,11 +40,13 @@ pub enum MainMenuQuestion {
     Search,
     ToggleNotifications,
     Delete,
+    RequestData,
 }
 
 const SEARCH: &str = "Straße auswählen/ändern";
 const NOTIFICATION: &str = "Benachrichtigungen ein-/ausschalten";
 const DELETE: &str = "Alle Daten löschen";
+const REQUEST_DATA: &str = "Gespeicherte Daten abfragen";
 
 impl std::fmt::Display for MainMenuQuestion {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
@@ -58,6 +60,9 @@ impl std::fmt::Display for MainMenuQuestion {
             self::MainMenuQuestion::Delete => {
                 write!(f, "{}", DELETE)
             }
+            self::MainMenuQuestion::RequestData => {
+                write!(f, "{}", REQUEST_DATA)
+            }
         }
     }
 }
@@ -70,6 +75,7 @@ impl FromStr for MainMenuQuestion {
             SEARCH => Ok(MainMenuQuestion::Search),
             NOTIFICATION => Ok(MainMenuQuestion::ToggleNotifications),
             DELETE => Ok(MainMenuQuestion::Delete),
+            REQUEST_DATA => Ok(MainMenuQuestion::RequestData),
             _ => Err("Could not convert to MainMenuQuestion."),
         }
     }

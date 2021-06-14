@@ -166,14 +166,19 @@ async fn bot_dialogue(
                     )
                     .reply_markup(
                         ReplyKeyboardMarkup::from(vec![
-                            vec![KeyboardButton::new(MainMenuQuestion::Search.to_string())],
-                            vec![KeyboardButton::new(
-                                MainMenuQuestion::ToggleNotifications.to_string(),
-                            )],
-                            vec![KeyboardButton::new(MainMenuQuestion::Delete.to_string())],
+                            vec![
+                                KeyboardButton::new(MainMenuQuestion::Search.to_string()),
+                                KeyboardButton::new(
+                                    MainMenuQuestion::ToggleNotifications.to_string(),
+                                ),
+                            ],
+                            vec![
+                                KeyboardButton::new(MainMenuQuestion::Delete.to_string()),
+                                KeyboardButton::new(MainMenuQuestion::RequestData.to_string()),
+                            ],
                         ])
                         .one_time_keyboard(false)
-                        .resize_keyboard(true),
+                        .resize_keyboard(false),
                     ),
                 )
                 .await
@@ -566,6 +571,40 @@ async fn bot_dialogue(
                             .unwrap();
 
                         Next(Remove)
+                    }
+                    MainMenuQuestion::RequestData => {
+                        log::info!("User data request: main menu");
+
+                        match context.request_performer.get_my_user_data(chat_id).await {
+                            Ok(user_data) => {
+                                context
+                                    .api
+                                    .execute(SendMessage::new(
+                                        chat_id,
+                                        user_data
+                                            .iter()
+                                            .map(|(a, b)| a.to_owned() + ": " + b)
+                                            .collect::<Vec<String>>()
+                                            .join("\n")
+                                            .to_string(),
+                                    ))
+                                    .await
+                                    .unwrap();
+                            }
+                            Err(e) => {
+                                log::error!("failed requesting user data: {}", e);
+                                context
+                                    .api
+                                    .execute(SendMessage::new(
+                                        chat_id,
+                                        MESSAGE_ERROR_REQUEST_USER_DATA,
+                                    ))
+                                    .await
+                                    .unwrap();
+                            }
+                        };
+
+                        Next(MainMenu)
                     }
                 },
                 Err(e) => {
