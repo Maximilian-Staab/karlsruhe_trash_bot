@@ -1,0 +1,12 @@
+query UserData($telegram_chat_id: Int!) {
+    users_by_pk(telegram_chat_id: $telegram_chat_id) {
+        created_at
+        enabled_notifications
+        house_number
+        street
+        telegram_chat_id
+        streetByStreet {
+            name
+        }
+    }
+}
