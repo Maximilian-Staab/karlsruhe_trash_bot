@@ -1,7 +1,4 @@
-mod menu;
-mod strings;
-
-use std::convert::{Infallible, TryInto};
+use std::convert::Infallible;
 use std::env;
 use std::str::FromStr;
 use std::time::Duration;
@@ -15,16 +12,13 @@ use carapax::{
     },
     longpoll::LongPoll,
     methods::SendMessage,
-    ratelimit::{
-        limit_all_chats, limit_all_users, nonzero, DirectRateLimitHandler, KeyedRateLimitHandler,
-        RateLimitList,
-    },
+    ratelimit::{limit_all_chats, nonzero, KeyedRateLimitHandler},
     session::{backend::fs::FilesystemBackend, SessionManager},
     types::{
         KeyboardButton, Message,
         MessageData::{Location, Text},
         ParseMode::Markdown,
-        ReplyKeyboardMarkup, ReplyMarkup,
+        ReplyKeyboardMarkup,
     },
     Api, Dispatcher,
 };
@@ -32,21 +26,23 @@ use serde::{Deserialize, Serialize};
 use tempfile::tempdir;
 use tokio::sync::mpsc;
 
-use trash_bot::trash_dates::{RequestPerformer, Street};
-
 use crate::location_lookup::{LocationLookup, LocationResult, Lookup};
+use crate::trash_dates::{RequestPerformer, Street};
+
+mod menu;
+mod strings;
 
 #[derive(Serialize, Deserialize)]
 enum States {
-    Start,                             // Done
-    MainMenu,                          // Done
-    Search,                            // Done
-    SearchManually,                    // Done
-    SearchManuallyKeyboard,            // Done
-    SearchManuallyHouseNumber,         // Done
-    SearchManuallyHouseNumberKeyboard, // Done
-    SearchAskIfOk,                     // Done
-    Remove,                            // Done
+    Start,
+    MainMenu,
+    Search,
+    SearchManually,
+    SearchManuallyKeyboard,
+    SearchManuallyHouseNumber,
+    SearchManuallyHouseNumberKeyboard,
+    SearchAskIfOk,
+    Remove,
 }
 
 impl State for States {
@@ -98,6 +94,7 @@ async fn bot_dialogue(
     let last_name = user.last_name.clone();
     let mut session = context.session_manager.get_session(&input).unwrap();
 
+    #[allow(clippy::eval_order_dependence)]
     Ok(match state {
         Start => {
             context
@@ -335,7 +332,7 @@ async fn bot_dialogue(
                             first_name,
                             last_name,
                             chat_id,
-                            session.get("street_id").await.unwrap().unwrap(),
+                            session.get("street_id").await.unwrap(),
                             session.get("street_number").await.unwrap(),
                         )
                         .await;
@@ -547,12 +544,64 @@ async fn bot_dialogue(
     })
 }
 
+fn dates_to_message<T>(something: &[T]) -> String
+where
+    T: ToString,
+{
+    if let [] = something {
+        Default::default()
+    } else {
+        something
+            .iter()
+            .map(ToString::to_string)
+            .collect::<Vec<String>>()
+            .join(", ")
+    }
+}
+
 impl Bot {
+    pub async fn scheduler() {
+        use clokwerk::{AsyncScheduler, Job, TimeUnits};
+
+        let mut scheduler = AsyncScheduler::with_tz(chrono_tz::Europe::Berlin);
+
+        scheduler.every(1.day()).at("16:00:00").run(|| async {
+            let request_performer = RequestPerformer::from_env();
+
+            let token = env::var("TELEGRAM_BOT_TOKEN").expect("TELEGRAM_BOT_TOKEN not set");
+            let api: Api = Api::new(token).unwrap();
+
+            match request_performer.get_active_users_tomorrow().await {
+                Ok(users) => {
+                    for user in users {
+                        api.execute(SendMessage::new(
+                            user.client_id,
+                            dates_to_message(&user.dates[..]),
+                        ))
+                        .await
+                        .unwrap();
+                    }
+                }
+                Err(e) => log::warn!("Error while getting trash dates: {}", e),
+            };
+        });
+
+        loop {
+            scheduler.run_pending().await;
+            tokio::time::sleep(Duration::from_secs(10)).await;
+        }
+    }
+
     pub async fn start() {
+        // Start notificator
+        log::info!("Start daily notification service...");
+        tokio::spawn(async { Bot::scheduler().await });
+
         let token = env::var("TELEGRAM_BOT_TOKEN").expect("TELEGRAM_BOT_TOKEN not set");
         let api: Api = Api::new(token).expect("Failed to create API");
         let (lookup_request_sender, lookup_request_receiver) = mpsc::channel::<Lookup>(32);
 
+        log::info!("Starting geolocation lookup service.");
         let mut lookup_device = LocationLookup::new(lookup_request_receiver).await;
 
         tokio::spawn(async move {
@@ -581,6 +630,7 @@ impl Bot {
 
         dispatcher.add_handler(Dialogue::new(session_manager, dialogue_name, bot_dialogue));
 
+        log::info!("Starting message handling...");
         LongPoll::new(api, dispatcher).run().await;
     }
 }

@@ -1,4 +1,4 @@
-mutation AddUser($last_name: String, $first_name: String, $telegram_chat_id: Int, $street: Int, $house_number: String = "") {
+mutation AddUser($last_name: String, $first_name: String, $telegram_chat_id: Int!, $street: Int, $house_number: String = "") {
     insert_users_one(object: {last_name: $last_name, first_name: $first_name, telegram_chat_id: $telegram_chat_id, street: $street, enabled_notifications: true, house_number: $house_number}, on_conflict: {constraint: Users_telegram_chat_id_key, update_columns: [house_number, street, first_name, last_name]}) {
         created_at
     }

@@ -236,6 +236,7 @@ impl RequestPerformer {
         )
     }
 
+    #[allow(dead_code)]
     pub async fn get_tomorrows_trash(&self, user_id: i64) -> Result<Vec<TrashDate>, Error> {
         // let variables: trash_at_date::Variables();
         let request_body = TomorrowForUser::build_query(tomorrow_for_user::Variables { user_id });
@@ -305,14 +306,14 @@ impl RequestPerformer {
         first_name: Option<String>,
         last_name: Option<String>,
         telegram_chat_id: i64,
-        street: i64,
+        street: Option<i64>,
         house_number: Option<String>,
     ) {
         let response_body = AddUser::build_query(add_user::Variables {
             last_name,
             first_name,
-            telegram_chat_id: Some(telegram_chat_id),
-            street: Some(street),
+            telegram_chat_id,
+            street,
             house_number,
         });
 
@@ -346,6 +347,7 @@ impl RequestPerformer {
         ).await;
     }
 
+    #[allow(dead_code)]
     pub async fn get_active_users(&self) -> Result<Vec<User>, Error> {
         let response_body = ActiveUsers::build_query(active_users::Variables {});
         let response_data: active_users::ResponseData = self.send_request(&response_body).await;

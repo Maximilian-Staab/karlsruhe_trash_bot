@@ -18,3 +18,10 @@ and authenticate with it:
 | HASURA_ENDPOINT    |         | Graphql endpoint url                         |
 | HASURA_SECRET      |         | Graphql endpoint secret                      |
 | RUST_LOG           |         | (Optional) Set log level for the application |
+
+
+# TODO:
+
+* [ ] Add doc-tests
+* [ ] Convert geocoding crate to be non-blocking, then use it here
+* [ ] Add more cities?
