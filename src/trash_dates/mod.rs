@@ -283,7 +283,7 @@ impl RequestPerformer {
         } else {
             response
                 .data
-                .ok_or(Error::msg("could not extract data from graphql query"))
+                .ok_or_else(|| Error::msg("could not extract data from graphql query"))
         }
     }
 
@@ -304,7 +304,7 @@ impl RequestPerformer {
         let result: notification_status::ResponseData = self.send_request(&response_body).await?;
         Ok(result
             .users_by_pk
-            .ok_or(Error::msg("user not found"))?
+            .ok_or_else(|| Error::msg("user not found"))?
             .enabled_notifications)
     }
 
@@ -339,7 +339,7 @@ impl RequestPerformer {
         let result: delete_user::ResponseData = self.send_request(&response_body).await?;
         Ok(result
             .delete_users
-            .ok_or(Error::msg("user not found"))?
+            .ok_or_else(|| Error::msg("user not found"))?
             .affected_rows
             == 1)
     }
