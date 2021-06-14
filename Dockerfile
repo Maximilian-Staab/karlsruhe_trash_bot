@@ -11,5 +11,5 @@ RUN cargo install --path .
 
 FROM debian:buster-slim
 RUN apt-get update && rm -rf /var/lib/apt/lists/*
-COPY --from=builder /usr/local/cargo/bin/telegram_notificator /usr/local/bin/telegram_notificator
+COPY --from=builder /usr/local/cargo/bin/trash_bot /usr/local/bin/trash_bot
 CMD ["trash_bot"]
