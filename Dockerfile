@@ -1,6 +1,12 @@
 FROM rust:latest as builder
 WORKDIR /usr/src/telegram_notificator
-COPY . .
+
+COPY src src
+COPY graphql graphql
+COPY Cargo.toml Cargo.toml
+COPY Cargo.lock Cargo.lock
+COPY trash_bot.iml trash_bot.iml
+
 RUN cargo install --path .
 
 FROM debian:buster-slim
