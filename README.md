@@ -1,4 +1,4 @@
-# Telegram-Bot: Karlsruhe Entsorgungstermine
+# Entsorgungskalender Chatbot - Karlsruhe 
 
 **Dieser Chatbot hat nichts mit irgendeiner offiziellen Stelle der Stadt Karlsruhe zu tun. Dies ist ein Hobbyprojekt,
 welches ich fur mich selbst geschrieben habe.**
