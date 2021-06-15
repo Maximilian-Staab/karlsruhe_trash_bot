@@ -21,6 +21,7 @@ and authenticate with it:
 | TELEGRAM_BOT_TOKEN |         | Token for your telegram bot                  |
 | HASURA_ENDPOINT    |         | Graphql endpoint url                         |
 | HASURA_SECRET      |         | Graphql endpoint secret                      |
+| OPENSTREETMAP_ENDPOINT | https://nominatim.openstreetmap.org/ | (Optional) proxy for caching requests |
 | RUST_LOG           |         | (Optional) Set log level for the application |
 
 

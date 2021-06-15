@@ -3,6 +3,7 @@ use std::fmt::{Display, Formatter};
 use anyhow::{Error, Result};
 use geocoding::{DetailedReverse, Openstreetmap, Point};
 use serde::{Deserialize, Serialize};
+use std::env;
 use std::time::Duration;
 use tokio::sync::mpsc::Receiver;
 use tokio::sync::oneshot;
@@ -80,11 +81,16 @@ impl LocationLookup {
 
             let longitude = lookup.longitude;
             let latitude = lookup.latitude;
-            let result = tokio::task::spawn_blocking(move || {
-                Openstreetmap::new().detailed_reverse(&Point::new(longitude, latitude))
-            })
-            .await
-            .expect("Task didn't finish.");
+            let result =
+                tokio::task::spawn_blocking(move || match env::var("OPENSTREETMAP_ENDPOINT") {
+                    Ok(endpoint) => Openstreetmap::new_with_endpoint(endpoint)
+                        .detailed_reverse(&Point::new(longitude, latitude)),
+                    Err(_) => {
+                        Openstreetmap::new().detailed_reverse(&Point::new(longitude, latitude))
+                    }
+                })
+                .await
+                .expect("Task didn't finish.");
 
             if let Err(e) = result {
                 lookup.responder.send(Err(Error::from(e))).unwrap();
