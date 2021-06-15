@@ -12,7 +12,7 @@ graphql_client = "0.9.0"
 reqwest = { version = "0.11.3", default-features = false, features = ["json", "rustls-tls"] }
 chrono-tz = "0.5.3"
 tokio = { version = "1.5.0", features = ["macros", "rt-multi-thread", "sync"] }
-anyhow = "1.0.40"
+anyhow = "1.0.41"
 log = "0.4.14"
 env_logger = "0.8.3"
 carapax = { version = "0.10.0", features = ["ratelimit", "dialogue", "session-fs"] }
