@@ -269,7 +269,9 @@ impl RequestPerformer {
             .collect())
     }
 
-    fn log_errors<T>(&self, response: Response<T>) -> Result<T> {
+    fn log_errors<T: Debug>(&self, response: Response<T>) -> Result<T> {
+        log::info!("graphql response: {:?}", response);
+
         if let Some(errors) = &response.errors {
             log::error!("Something failed!");
 
@@ -283,7 +285,7 @@ impl RequestPerformer {
         } else {
             response
                 .data
-                .ok_or_else(|| Error::msg("could not extract data from graphql query"))
+                .ok_or_else(|| Error::msg("no data in query result"))
         }
     }
 
@@ -362,7 +364,7 @@ impl RequestPerformer {
         .await
     }
 
-    async fn send_request<T: Serialize + ?Sized, R: DeserializeOwned>(
+    async fn send_request<T: Serialize + ?Sized, R: DeserializeOwned + Debug>(
         &self,
         json: &T,
     ) -> Result<R> {
