@@ -282,35 +282,47 @@ async fn bot_dialogue(
         }
         SearchManually => match input.data {
             Text(t) => {
-                let search_results = context
+                match context
                     .request_performer
                     .search_similar_streets(t.data)
                     .await
-                    .unwrap();
+                {
+                    Ok(search_results) => {
+                        session.set("street_search", &search_results).await.unwrap();
 
-                session.set("street_search", &search_results).await.unwrap();
+                        let mut reply_keyboard_rows: Vec<Vec<KeyboardButton>> =
+                            Vec::with_capacity(search_results.len());
 
-                let mut reply_keyboard_rows: Vec<Vec<KeyboardButton>> =
-                    Vec::with_capacity(search_results.len());
+                        for street in search_results {
+                            reply_keyboard_rows.push(vec![KeyboardButton::new(street.street)]);
+                        }
+                        reply_keyboard_rows.push(vec![KeyboardButton::new(MENU_NO_STREET_CORRECT)]);
 
-                for street in search_results {
-                    reply_keyboard_rows.push(vec![KeyboardButton::new(street.street)]);
+                        context
+                            .api
+                            .execute(
+                                SendMessage::new(chat_id, MESSAGE_CONFIRM_ONE_OF_THE_STREETS)
+                                    .reply_markup(
+                                        ReplyKeyboardMarkup::from_vec(reply_keyboard_rows)
+                                            .resize_keyboard(true)
+                                            .one_time_keyboard(true),
+                                    ),
+                            )
+                            .await
+                            .unwrap();
+
+                        Next(SearchManuallyKeyboard)
+                    }
+                    Err(e) => {
+                        log::error!("Finding streets failed: {}", e);
+                        context
+                            .api
+                            .execute(SendMessage::new(chat_id, MESSAGE_ERROR_STREET_SEARCH))
+                            .await
+                            .unwrap();
+                        Next(Start)
+                    }
                 }
-                reply_keyboard_rows.push(vec![KeyboardButton::new(MENU_NO_STREET_CORRECT)]);
-
-                context
-                    .api
-                    .execute(
-                        SendMessage::new(chat_id, MESSAGE_CONFIRM_ONE_OF_THE_STREETS).reply_markup(
-                            ReplyKeyboardMarkup::from_vec(reply_keyboard_rows)
-                                .resize_keyboard(true)
-                                .one_time_keyboard(true),
-                        ),
-                    )
-                    .await
-                    .unwrap();
-
-                Next(SearchManuallyKeyboard)
             }
             _ => Next(Start),
         },

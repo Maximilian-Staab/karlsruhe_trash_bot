@@ -9,6 +9,8 @@ pub const CONFIRM_STREET_AND_NUMBER: &str = "Ist das die korrekte Straße und Ha
 
 pub const MESSAGE_SEARCH_COULD_NOT_FIND: &str = "Konnte deine Straße nicht in der Datenbank finden. Bitte gib den Namen deiner Straße ein um Vorschläge anzuzeigen:";
 pub const MESSAGE_CONFIRM_ONE_OF_THE_STREETS: &str = "Ist deine Straße hier aufgeführt?";
+pub const MESSAGE_ERROR_STREET_SEARCH: &str =
+    "Konnte keine Verbindung mit der Datenbank aufbauen, versuche es später nochmal.";
 pub const MESSAGE_SAVE_LOCATION: &str =
     "Speichere deinen Standort für die Abfrage der Entsorgungstermine.";
 pub const MESSAGE_CONFIRM_ADDRESS_ADDED: &str = "Adresse hinzugefügt!";
