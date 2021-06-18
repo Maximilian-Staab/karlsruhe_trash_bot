@@ -26,6 +26,7 @@ use serde::{Deserialize, Serialize};
 use tempfile::tempdir;
 use tokio::sync::mpsc;
 
+use crate::bot_logic::telegram_tool::send_message;
 use crate::location_lookup::{LocationLookup, LocationResult, Lookup};
 use crate::trash_dates::{RequestPerformer, Street};
 
@@ -80,7 +81,7 @@ async fn get_reverse_location(
 
 async fn add_user(
     request_performer: &RequestPerformer,
-    api: &Api,
+    api: Api,
     telegram_chat_id: i64,
     street: Option<i64>,
     house_number: Option<String>,
@@ -89,48 +90,66 @@ async fn add_user(
 
     log::info!("User entered the house correctly, updating user profile.");
 
-    api.execute(SendMessage::new(telegram_chat_id, MESSAGE_SAVE_LOCATION))
-        .await
-        .unwrap();
+    send_message(
+        api.clone(),
+        SendMessage::new(telegram_chat_id, MESSAGE_SAVE_LOCATION),
+    )
+    .await;
 
     match request_performer
         .add_user(telegram_chat_id, street, house_number)
         .await
     {
-        Ok(_) => api
-            .execute(SendMessage::new(
-                telegram_chat_id,
-                MESSAGE_CONFIRM_ADDRESS_ADDED,
-            ))
+        Ok(_) => {
+            send_message(
+                api,
+                SendMessage::new(telegram_chat_id, MESSAGE_CONFIRM_ADDRESS_ADDED),
+            )
             .await
-            .unwrap(),
-        Err(_) => api
-            .execute(SendMessage::new(
-                telegram_chat_id,
-                MESSAGE_ERROR_ADDRESS_ADDED,
-            ))
+        }
+        Err(_) => {
+            send_message(
+                api,
+                SendMessage::new(telegram_chat_id, MESSAGE_ERROR_ADDRESS_ADDED),
+            )
             .await
-            .unwrap(),
+        }
     };
 }
 
 async fn send_affirmative_or_negative(
-    api: &Api,
+    api: Api,
     telegram_chat_id: i64,
     switch: bool,
     positive_message: &str,
     negative_message: &str,
 ) {
     match switch {
-        true => api
-            .execute(SendMessage::new(telegram_chat_id, positive_message))
-            .await
-            .unwrap(),
-        false => api
-            .execute(SendMessage::new(telegram_chat_id, negative_message))
-            .await
-            .unwrap(),
+        true => send_message(api, SendMessage::new(telegram_chat_id, positive_message)).await,
+        false => send_message(api, SendMessage::new(telegram_chat_id, negative_message)).await,
     };
+}
+
+mod telegram_tool {
+    use backoff::future::retry;
+    use backoff::Error::Transient;
+    use backoff::ExponentialBackoff;
+    use carapax::methods::SendMessage;
+    use carapax::Api;
+
+    pub async fn send_message(api: Api, to_send: SendMessage) {
+        retry(ExponentialBackoff::default(), || async {
+            api.execute(to_send.clone()).await.map_err(Transient)
+        })
+        .await
+        .map_err(|e| {
+            log::error!(
+                "Error while sending telegram message after multiple retries: {}",
+                e
+            )
+        })
+        .unwrap();
+    }
 }
 
 #[dialogue]
@@ -142,47 +161,45 @@ async fn bot_dialogue(
     use self::menu::*;
     use self::strings::*;
     use self::States::*;
+    use telegram_tool::send_message;
 
     let chat_id = input.get_chat_id();
     let user = input.get_user().unwrap();
     let first_name = user.first_name.clone();
     let mut session = context.session_manager.get_session(&input).unwrap();
+    let api = context.api.clone();
 
     #[allow(clippy::eval_order_dependence)]
     Ok(match state {
         Start => {
-            context
-                .api
-                .execute(
-                    SendMessage::new(
-                        chat_id,
-                        format!(
-                            "{}{}{}!\n{}",
-                            HELLO,
-                            if !first_name.is_empty() { " " } else { "" },
-                            first_name,
-                            MESSAGE_ASK_WHAT_USER_WANTS
-                        ),
-                    )
-                    .reply_markup(
-                        ReplyKeyboardMarkup::from(vec![
-                            vec![
-                                KeyboardButton::new(MainMenuQuestion::Search.to_string()),
-                                KeyboardButton::new(
-                                    MainMenuQuestion::ToggleNotifications.to_string(),
-                                ),
-                            ],
-                            vec![
-                                KeyboardButton::new(MainMenuQuestion::Delete.to_string()),
-                                KeyboardButton::new(MainMenuQuestion::RequestData.to_string()),
-                            ],
-                        ])
-                        .one_time_keyboard(false)
-                        .resize_keyboard(false),
+            send_message(
+                context.api.clone(),
+                SendMessage::new(
+                    chat_id,
+                    format!(
+                        "{}{}{}!\n{}",
+                        HELLO,
+                        if !first_name.is_empty() { " " } else { "" },
+                        first_name,
+                        MESSAGE_ASK_WHAT_USER_WANTS
                     ),
                 )
-                .await
-                .unwrap();
+                .reply_markup(
+                    ReplyKeyboardMarkup::from(vec![
+                        vec![
+                            KeyboardButton::new(MainMenuQuestion::Search.to_string()),
+                            KeyboardButton::new(MainMenuQuestion::ToggleNotifications.to_string()),
+                        ],
+                        vec![
+                            KeyboardButton::new(MainMenuQuestion::Delete.to_string()),
+                            KeyboardButton::new(MainMenuQuestion::RequestData.to_string()),
+                        ],
+                    ])
+                    .one_time_keyboard(false)
+                    .resize_keyboard(false),
+                ),
+            )
+            .await;
 
             Next(MainMenu)
         }
@@ -197,11 +214,12 @@ async fn bot_dialogue(
                         Err(e) => {
                             log::warn!("Could not find reverse location: {}", e);
 
-                            context
-                                .api
-                                .execute(SendMessage::new(chat_id, MESSAGE_ASK_FOR_MANUAL_ENTRY))
-                                .await
-                                .unwrap();
+                            send_message(
+                                api,
+                                SendMessage::new(chat_id, MESSAGE_ASK_FOR_MANUAL_ENTRY),
+                            )
+                            .await;
+
                             Next(SearchManually)
                         }
                         Ok(location_result) => {
@@ -219,49 +237,44 @@ async fn bot_dialogue(
                                         .await
                                         .unwrap();
 
-                                    context
-                                        .api
-                                        .execute(
-                                            SendMessage::new(
-                                                chat_id,
-                                                format!(
-                                                    "{} *{}*",
-                                                    CONFIRM_STREET_AND_NUMBER, location_result
-                                                ),
-                                            )
-                                            .reply_markup(
-                                                ReplyKeyboardMarkup::from(vec![
-                                                    vec![KeyboardButton::new(
-                                                        LocationQuestion::Correct.to_string(),
-                                                    )],
-                                                    vec![KeyboardButton::new(
-                                                        LocationQuestion::NumberFalse.to_string(),
-                                                    )],
-                                                    vec![KeyboardButton::new(
-                                                        LocationQuestion::AllFalse.to_string(),
-                                                    )],
-                                                ])
-                                                .one_time_keyboard(true)
-                                                .resize_keyboard(true),
-                                            )
-                                            .parse_mode(Markdown),
+                                    send_message(
+                                        api,
+                                        SendMessage::new(
+                                            chat_id,
+                                            format!(
+                                                "{} *{}*",
+                                                CONFIRM_STREET_AND_NUMBER, location_result
+                                            ),
                                         )
-                                        .await
-                                        .unwrap();
+                                        .reply_markup(
+                                            ReplyKeyboardMarkup::from(vec![
+                                                vec![KeyboardButton::new(
+                                                    LocationQuestion::Correct.to_string(),
+                                                )],
+                                                vec![KeyboardButton::new(
+                                                    LocationQuestion::NumberFalse.to_string(),
+                                                )],
+                                                vec![KeyboardButton::new(
+                                                    LocationQuestion::AllFalse.to_string(),
+                                                )],
+                                            ])
+                                            .one_time_keyboard(true)
+                                            .resize_keyboard(true),
+                                        )
+                                        .parse_mode(Markdown),
+                                    )
+                                    .await;
 
                                     Next(SearchAskIfOk)
                                 }
                                 Err(e) => {
                                     log::error!("{}", e);
 
-                                    context
-                                        .api
-                                        .execute(SendMessage::new(
-                                            chat_id,
-                                            MESSAGE_SEARCH_COULD_NOT_FIND,
-                                        ))
-                                        .await
-                                        .unwrap();
+                                    send_message(
+                                        api,
+                                        SendMessage::new(chat_id, MESSAGE_SEARCH_COULD_NOT_FIND),
+                                    )
+                                    .await;
 
                                     Next(SearchManually)
                                 }
@@ -270,11 +283,7 @@ async fn bot_dialogue(
                     }
                 }
                 Text(_) => {
-                    context
-                        .api
-                        .execute(SendMessage::new(chat_id, MESSAGE_ENTER_STREET_NAME))
-                        .await
-                        .unwrap();
+                    send_message(api, SendMessage::new(chat_id, MESSAGE_ENTER_STREET_NAME)).await;
                     Next(SearchManually)
                 }
                 _ => Next(Start),
@@ -290,36 +299,33 @@ async fn bot_dialogue(
                     Ok(search_results) => {
                         session.set("street_search", &search_results).await.unwrap();
 
-                        let mut reply_keyboard_rows: Vec<Vec<KeyboardButton>> =
-                            Vec::with_capacity(search_results.len());
+                        send_message(api, {
+                            let mut reply_keyboard_rows: Vec<Vec<KeyboardButton>> =
+                                Vec::with_capacity(search_results.len());
 
-                        for street in search_results {
-                            reply_keyboard_rows.push(vec![KeyboardButton::new(street.street)]);
-                        }
-                        reply_keyboard_rows.push(vec![KeyboardButton::new(MENU_NO_STREET_CORRECT)]);
+                            for street in search_results {
+                                reply_keyboard_rows.push(vec![KeyboardButton::new(street.street)]);
+                            }
+                            reply_keyboard_rows
+                                .push(vec![KeyboardButton::new(MENU_NO_STREET_CORRECT)]);
 
-                        context
-                            .api
-                            .execute(
-                                SendMessage::new(chat_id, MESSAGE_CONFIRM_ONE_OF_THE_STREETS)
-                                    .reply_markup(
-                                        ReplyKeyboardMarkup::from_vec(reply_keyboard_rows)
-                                            .resize_keyboard(true)
-                                            .one_time_keyboard(true),
-                                    ),
-                            )
-                            .await
-                            .unwrap();
+                            SendMessage::new(chat_id, MESSAGE_CONFIRM_ONE_OF_THE_STREETS)
+                                .reply_markup(
+                                    ReplyKeyboardMarkup::from_vec(reply_keyboard_rows)
+                                        .resize_keyboard(true)
+                                        .one_time_keyboard(true),
+                                )
+                        })
+                        .await;
 
                         Next(SearchManuallyKeyboard)
                     }
                     Err(e) => {
                         log::error!("Finding streets failed: {}", e);
-                        context
-                            .api
-                            .execute(SendMessage::new(chat_id, MESSAGE_ERROR_STREET_SEARCH))
-                            .await
-                            .unwrap();
+
+                        send_message(api, SendMessage::new(chat_id, MESSAGE_ERROR_STREET_SEARCH))
+                            .await;
+
                         Next(Start)
                     }
                 }
@@ -338,24 +344,18 @@ async fn bot_dialogue(
                 {
                     if street.street == t.data {
                         session.set("street_id", &street.id).await.unwrap();
-                        context
-                            .api
-                            .execute(SendMessage::new(chat_id, HOUSE_NUMBER_MESSAGE))
-                            .await
-                            .unwrap();
+                        send_message(api.clone(), SendMessage::new(chat_id, HOUSE_NUMBER_MESSAGE))
+                            .await;
 
                         was_successful = true;
                         break;
                     }
                 }
+
                 if was_successful {
                     Next(SearchManuallyHouseNumber)
                 } else {
-                    context
-                        .api
-                        .execute(SendMessage::new(chat_id, HELP_MESSAGE))
-                        .await
-                        .unwrap();
+                    send_message(api, SendMessage::new(chat_id, HELP_MESSAGE)).await;
 
                     Next(SearchManually)
                 }
@@ -366,27 +366,25 @@ async fn bot_dialogue(
             Text(t) => {
                 log::info!("Ask the user whether the house number is correct.");
 
-                context
-                    .api
-                    .execute(
-                        SendMessage::new(
-                            chat_id,
-                            format!(
-                                "{}: {}?\n{}",
-                                HOUSE_NUMBER_QUESTION_1, t.data, HOUSE_NUMBER_QUESTION_2
-                            ),
-                        )
-                        .reply_markup(
-                            ReplyKeyboardMarkup::from_vec(vec![
-                                vec![KeyboardButton::new(YES)],
-                                vec![KeyboardButton::new(NO)],
-                            ])
-                            .resize_keyboard(true)
-                            .one_time_keyboard(true),
+                send_message(
+                    api,
+                    SendMessage::new(
+                        chat_id,
+                        format!(
+                            "{}: {}?\n{}",
+                            HOUSE_NUMBER_QUESTION_1, t.data, HOUSE_NUMBER_QUESTION_2
                         ),
                     )
-                    .await
-                    .unwrap();
+                    .reply_markup(
+                        ReplyKeyboardMarkup::from_vec(vec![
+                            vec![KeyboardButton::new(YES)],
+                            vec![KeyboardButton::new(NO)],
+                        ])
+                        .resize_keyboard(true)
+                        .one_time_keyboard(true),
+                    ),
+                )
+                .await;
 
                 session.set("street_number", &t.data).await.unwrap();
 
@@ -399,7 +397,7 @@ async fn bot_dialogue(
                 YES => {
                     add_user(
                         &context.request_performer,
-                        &context.api,
+                        api,
                         chat_id,
                         session.get("street_id").await.unwrap(),
                         session.get("street_number").await.unwrap(),
@@ -411,11 +409,7 @@ async fn bot_dialogue(
                 _ => {
                     log::info!("User entered the house number wrong, trying again.");
 
-                    context
-                        .api
-                        .execute(SendMessage::new(chat_id, HOUSE_NUMBER_MESSAGE))
-                        .await
-                        .unwrap();
+                    send_message(api, SendMessage::new(chat_id, HOUSE_NUMBER_MESSAGE)).await;
 
                     Next(SearchManuallyHouseNumber)
                 }
@@ -430,7 +424,7 @@ async fn bot_dialogue(
                     LocationQuestion::Correct => {
                         add_user(
                             &context.request_performer,
-                            &context.api,
+                            api,
                             chat_id,
                             session.get("street_id").await.unwrap(),
                             session.get("street_number").await.unwrap(),
@@ -439,19 +433,13 @@ async fn bot_dialogue(
                         Exit
                     }
                     LocationQuestion::NumberFalse => {
-                        context
-                            .api
-                            .execute(SendMessage::new(chat_id, MESSAGE_ENTER_HOUSE_NUMBER))
-                            .await
-                            .unwrap();
+                        send_message(api, SendMessage::new(chat_id, MESSAGE_ENTER_HOUSE_NUMBER))
+                            .await;
                         Next(SearchManuallyHouseNumber)
                     }
                     LocationQuestion::AllFalse => {
-                        context
-                            .api
-                            .execute(SendMessage::new(chat_id, MESSAGE_ENTER_STREET_NAME))
-                            .await
-                            .unwrap();
+                        send_message(api, SendMessage::new(chat_id, MESSAGE_ENTER_STREET_NAME))
+                            .await;
                         Next(SearchManually)
                     }
                 }
@@ -464,7 +452,7 @@ async fn bot_dialogue(
                     let worked = context.request_performer.remove_user_data(chat_id).await;
 
                     send_affirmative_or_negative(
-                        &context.api,
+                        api,
                         chat_id,
                         worked.unwrap_or(false),
                         MESSAGE_DELETED,
@@ -474,11 +462,7 @@ async fn bot_dialogue(
                     Exit
                 }
                 _ => {
-                    context
-                        .api
-                        .execute(SendMessage::new(chat_id, MESSAGE_NOTHING_HAPPENS))
-                        .await
-                        .unwrap();
+                    send_message(api, SendMessage::new(chat_id, MESSAGE_NOTHING_HAPPENS)).await;
                     Exit
                 }
             },
@@ -499,14 +483,11 @@ async fn bot_dialogue(
                             .one_time_keyboard(true)
                             .resize_keyboard(true);
 
-                        context
-                            .api
-                            .execute(
-                                SendMessage::new(chat_id, MESSAGE_ASK_SEARCH_MODE)
-                                    .reply_markup(markup),
-                            )
-                            .await
-                            .unwrap();
+                        send_message(
+                            api,
+                            SendMessage::new(chat_id, MESSAGE_ASK_SEARCH_MODE).reply_markup(markup),
+                        )
+                        .await;
 
                         Next(Search)
                     }
@@ -526,7 +507,7 @@ async fn bot_dialogue(
                                 {
                                     Ok(new_state) => {
                                         send_affirmative_or_negative(
-                                            &context.api,
+                                            api,
                                             chat_id,
                                             new_state,
                                             MESSAGE_NOTIFICATIONS_ACTIVATED,
@@ -539,29 +520,28 @@ async fn bot_dialogue(
                                             "error while changing notification status: {}",
                                             e
                                         );
-                                        context
-                                            .api
-                                            .execute(SendMessage::new(
+                                        send_message(
+                                            api,
+                                            SendMessage::new(
                                                 chat_id,
                                                 MESSAGE_ERROR_CHANGE_NOTIFICATION,
-                                            ))
-                                            .await
-                                            .unwrap();
+                                            ),
+                                        )
+                                        .await;
                                     }
                                 };
+
                                 Next(MainMenu)
                             }
                             Err(e) => {
                                 log::error!("{}", e);
 
-                                context
-                                    .api
-                                    .execute(SendMessage::new(
-                                        chat_id,
-                                        MESSAGE_CHANGE_NOTIFICATION_NEGATIVE,
-                                    ))
-                                    .await
-                                    .unwrap();
+                                send_message(
+                                    api,
+                                    SendMessage::new(chat_id, MESSAGE_CHANGE_NOTIFICATION_NEGATIVE),
+                                )
+                                .await;
+
                                 Next(MainMenu)
                             }
                         }
@@ -576,11 +556,12 @@ async fn bot_dialogue(
                         let markup = ReplyKeyboardMarkup::from(row)
                             .one_time_keyboard(true)
                             .resize_keyboard(true);
-                        context
-                            .api
-                            .execute(SendMessage::new(chat_id, DELETION).reply_markup(markup))
-                            .await
-                            .unwrap();
+
+                        send_message(
+                            api,
+                            SendMessage::new(chat_id, DELETION).reply_markup(markup),
+                        )
+                        .await;
 
                         Next(Remove)
                     }
@@ -589,9 +570,9 @@ async fn bot_dialogue(
 
                         match context.request_performer.get_my_user_data(chat_id).await {
                             Ok(user_data) => {
-                                context
-                                    .api
-                                    .execute(SendMessage::new(
+                                send_message(
+                                    api,
+                                    SendMessage::new(
                                         chat_id,
                                         user_data
                                             .iter()
@@ -599,20 +580,17 @@ async fn bot_dialogue(
                                             .collect::<Vec<String>>()
                                             .join("\n")
                                             .to_string(),
-                                    ))
-                                    .await
-                                    .unwrap();
+                                    ),
+                                )
+                                .await;
                             }
                             Err(e) => {
                                 log::error!("failed requesting user data: {}", e);
-                                context
-                                    .api
-                                    .execute(SendMessage::new(
-                                        chat_id,
-                                        MESSAGE_ERROR_REQUEST_USER_DATA,
-                                    ))
-                                    .await
-                                    .unwrap();
+                                send_message(
+                                    api,
+                                    SendMessage::new(chat_id, MESSAGE_ERROR_REQUEST_USER_DATA),
+                                )
+                                .await;
                             }
                         };
 
@@ -659,12 +637,11 @@ impl Bot {
             match request_performer.get_active_users_tomorrow().await {
                 Ok(users) => {
                     for user in users {
-                        api.execute(SendMessage::new(
-                            user.client_id,
-                            dates_to_message(&user.dates[..]),
-                        ))
-                        .await
-                        .unwrap();
+                        send_message(
+                            api.clone(),
+                            SendMessage::new(user.client_id, dates_to_message(&user.dates[..])),
+                        )
+                        .await;
                     }
                 }
                 Err(e) => log::warn!("Error while getting trash dates: {}", e),
