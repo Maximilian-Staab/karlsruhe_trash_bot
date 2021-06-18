@@ -189,6 +189,9 @@ async fn bot_dialogue(
                         vec![
                             KeyboardButton::new(MainMenuQuestion::Search.to_string()),
                             KeyboardButton::new(MainMenuQuestion::ToggleNotifications.to_string()),
+                            KeyboardButton::new(
+                                MainMenuQuestion::ManualRequestTomorrow.to_string(),
+                            ),
                         ],
                         vec![
                             KeyboardButton::new(MainMenuQuestion::Delete.to_string()),
@@ -545,6 +548,31 @@ async fn bot_dialogue(
                                 Next(MainMenu)
                             }
                         }
+                    }
+                    MainMenuQuestion::ManualRequestTomorrow => {
+                        log::info!("Manual request for tomorrows garbage dates.");
+
+                        match context.request_performer.get_tomorrows_trash(chat_id).await {
+                            Ok(t) => {
+                                let mut trash: String = t
+                                    .into_iter()
+                                    .map(|a| a.name)
+                                    .collect::<Vec<String>>()
+                                    .join(", ");
+                                if trash.is_empty() {
+                                    trash = String::from(MESSAGE_NO_TRASH_TOMORROW);
+                                } else {
+                                    trash = String::from(MESSAGE_TRASH_TOMORROW) + trash.as_str();
+                                }
+                                send_message(api, SendMessage::new(chat_id, trash))
+                            }
+                            Err(e) => {
+                                log::error!("Could not get tomorrows trash dates for manual user request: {}", e);
+                                send_message(api, SendMessage::new(chat_id, MESSAGE_ERROR_REQUEST))
+                            }
+                        }.await;
+
+                        Next(MainMenu)
                     }
                     MainMenuQuestion::Delete => {
                         log::info!("User data deletion: main menu");

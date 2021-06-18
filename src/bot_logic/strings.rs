@@ -11,6 +11,9 @@ pub const MESSAGE_SEARCH_COULD_NOT_FIND: &str = "Konnte deine Straße nicht in d
 pub const MESSAGE_CONFIRM_ONE_OF_THE_STREETS: &str = "Ist deine Straße hier aufgeführt?";
 pub const MESSAGE_ERROR_STREET_SEARCH: &str =
     "Konnte keine Verbindung mit der Datenbank aufbauen, versuche es später nochmal.";
+pub const MESSAGE_ERROR_REQUEST: &str = "Fehler beim Abruf der Daten, versuche es später nochmal!";
+pub const MESSAGE_NO_TRASH_TOMORROW: &str = "Du musst heute keinen Abfall vor die Tür stellen!";
+pub const MESSAGE_TRASH_TOMORROW: &str = "Morgen wird dieser Abfall abgeholt: ";
 pub const MESSAGE_SAVE_LOCATION: &str =
     "Speichere deinen Standort für die Abfrage der Entsorgungstermine.";
 pub const MESSAGE_CONFIRM_ADDRESS_ADDED: &str = "Adresse hinzugefügt!";

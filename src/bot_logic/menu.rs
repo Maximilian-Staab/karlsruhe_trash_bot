@@ -37,12 +37,14 @@ impl FromStr for LocationQuestion {
 }
 
 pub enum MainMenuQuestion {
+    ManualRequestTomorrow,
     Search,
     ToggleNotifications,
     Delete,
     RequestData,
 }
 
+const MANUAL_REQUEST_TOMORROW: &str = "Manuelle Abfrage";
 const SEARCH: &str = "Straße auswählen/ändern";
 const NOTIFICATION: &str = "Benachrichtigungen ein-/ausschalten";
 const DELETE: &str = "Alle Daten löschen";
@@ -51,6 +53,9 @@ const REQUEST_DATA: &str = "Gespeicherte Daten abfragen";
 impl std::fmt::Display for MainMenuQuestion {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
+            self::MainMenuQuestion::ManualRequestTomorrow => {
+                write!(f, "{}", MANUAL_REQUEST_TOMORROW)
+            }
             self::MainMenuQuestion::Search => {
                 write!(f, "{}", SEARCH)
             }
@@ -72,6 +77,7 @@ impl FromStr for MainMenuQuestion {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
+            MANUAL_REQUEST_TOMORROW => Ok(MainMenuQuestion::ManualRequestTomorrow),
             SEARCH => Ok(MainMenuQuestion::Search),
             NOTIFICATION => Ok(MainMenuQuestion::ToggleNotifications),
             DELETE => Ok(MainMenuQuestion::Delete),
