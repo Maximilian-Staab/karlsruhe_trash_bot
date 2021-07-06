@@ -23,6 +23,7 @@ pub enum TrashType {
     Recycling,
     Paper,
     Miscellaneous,
+    Debug,
 }
 
 #[derive(Eq, PartialEq, Debug, Clone)]
@@ -211,6 +212,7 @@ impl From<&str> for TrashType {
             "Wertstoff" => TrashType::Recycling,
             "Papier" => TrashType::Paper,
             "Restmüll" => TrashType::Miscellaneous,
+            "Debug" => TrashType::Debug,
             _ => panic!("Could not find the selected type of trash: {}", string),
         }
     }

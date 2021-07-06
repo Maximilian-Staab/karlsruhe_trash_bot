@@ -1,5 +1,5 @@
 query TomorrowForAll {
-    users(where: {enabled_notifications: {_eq: true}}) {
+    users(where: {enabled_notifications: {_eq: true}, dates: {date: {_eq: "tomorrow()"}}}) {
         dates(where: {date: {_eq: "tomorrow()"}}) {
             date
             trashTypeByTrashType {

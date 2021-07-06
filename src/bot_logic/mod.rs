@@ -657,6 +657,8 @@ impl Bot {
         let mut scheduler = AsyncScheduler::with_tz(chrono_tz::Europe::Berlin);
 
         scheduler.every(1.day()).at("16:00:00").run(|| async {
+            log::info!("Starting scheduled trash check...");
+
             let request_performer = RequestPerformer::from_env();
 
             let token = env::var("TELEGRAM_BOT_TOKEN").expect("TELEGRAM_BOT_TOKEN not set");
@@ -664,12 +666,19 @@ impl Bot {
 
             match request_performer.get_active_users_tomorrow().await {
                 Ok(users) => {
+                    log::info!("Found at least one user with an appointment tomorrow.");
+
                     for user in users {
-                        send_message(
-                            api.clone(),
-                            SendMessage::new(user.client_id, dates_to_message(&user.dates[..])),
-                        )
-                        .await;
+                        let message: String = dates_to_message(&user.dates[..]);
+                        if message.is_empty() {
+                            log::error!(
+                                "Empty date notification string, can't send message! {}",
+                                user
+                            );
+                        } else {
+                            send_message(api.clone(), SendMessage::new(user.client_id, message))
+                                .await;
+                        }
                     }
                 }
                 Err(e) => log::warn!("Error while getting trash dates: {}", e),
