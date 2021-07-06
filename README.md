@@ -1,4 +1,7 @@
 [![Publish Docker image](https://github.com/Maximilian-Staab/karlsruhe_trash_bot/actions/workflows/main.yml/badge.svg?branch=main)](https://github.com/Maximilian-Staab/karlsruhe_trash_bot/actions/workflows/main.yml)
+[![GitHub release](https://img.shields.io/github/v/release/Maximilian-Staab/karlsruhe_trash_bot)](https://github.com/Maximilian-Staab/karlsruhe_trash_bot/releases)
+![GitHub release](https://img.shields.io/github/commits-since/Maximilian-Staab/karlsruhe_trash_bot/latest)
+[![GitHub license](https://img.shields.io/badge/license-MIT%2FApache--2.0-blue)](https://github.com/Maximilian-Staab/karlsruhe_trash_bot/blob/main/LICENSE-APACHE)
 
 
 # Entsorgungskalender Chatbot - Karlsruhe 
