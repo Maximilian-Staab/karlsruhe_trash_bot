@@ -1,6 +1,6 @@
 [package]
 name = "trash_bot"
-version = "1.0.3"
+version = "1.0.4"
 authors = ["Maximilian Staab <maximilian.staab@mailbox.org>"]
 edition = "2018"
 
